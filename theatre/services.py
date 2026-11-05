@@ -10,14 +10,18 @@ def require_permission(user, permission):
 
 
 @transaction.atomic
-def create_intervention(*, user, room, procedure, doctor):
+def create_intervention(*, user, room, procedure, doctor, anesthetist):
     require_permission(user, 'theatre.operate_intervention')
     locked_room = Room.objects.select_for_update().get(pk=room.pk)
     if not locked_room.active or not Procedure.objects.get(pk=procedure.pk).active or not Doctor.objects.get(pk=doctor.pk).active:
         raise ValidationError('Seleccione elementos activos de las listas.')
+    if not anesthetist or not Doctor.objects.filter(
+        pk=anesthetist.pk, active=True, specialty__active=True, specialty__is_anesthesia=True,
+    ).exists():
+        raise ValidationError('Seleccione un anestesista activo con especialidad habilitada para anestesia.')
     if Intervention.objects.filter(room=locked_room, completed_at__isnull=True).exists():
         raise ValidationError('Este pabellón ya tiene una intervención en curso. Retómela antes de crear otra.')
-    return Intervention.objects.create(room=locked_room, procedure=procedure, doctor=doctor, created_by=user)
+    return Intervention.objects.create(room=locked_room, procedure=procedure, doctor=doctor, anesthetist=anesthetist, created_by=user)
 
 
 @transaction.atomic

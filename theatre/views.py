@@ -13,7 +13,7 @@ from .services import correct_event, create_intervention, record_event
 @login_required
 @permission_required('theatre.operate_intervention', raise_exception=True)
 def interventions(request):
-    queryset = Intervention.objects.select_related('room', 'procedure', 'doctor', 'created_by')
+    queryset = Intervention.objects.select_related('room', 'procedure', 'doctor', 'anesthetist', 'created_by')
     status = request.GET.get('estado', 'curso')
     if status == 'finalizadas':
         queryset = queryset.filter(completed_at__isnull=False)
@@ -42,7 +42,7 @@ def create(request):
 @login_required
 @permission_required('theatre.operate_intervention', raise_exception=True)
 def detail(request, pk):
-    intervention = get_object_or_404(Intervention.objects.select_related('room', 'procedure', 'doctor', 'created_by'), pk=pk)
+    intervention = get_object_or_404(Intervention.objects.select_related('room', 'procedure', 'doctor', 'anesthetist', 'created_by'), pk=pk)
     events = list(intervention.events.select_related('recorded_by').prefetch_related('corrections__corrected_by'))
     by_stage = {e.stage: e for e in events}
     rows = []

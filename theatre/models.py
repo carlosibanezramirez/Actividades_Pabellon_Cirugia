@@ -28,6 +28,11 @@ class Procedure(Catalog):
 
 
 class Specialty(Catalog):
+    is_anesthesia = models.BooleanField(
+        'Habilita como anestesista', default=False,
+        help_text='Los médicos activos con esta especialidad podrán seleccionarse como anestesistas.',
+    )
+
     class Meta(Catalog.Meta):
         verbose_name = 'especialidad'
         verbose_name_plural = 'especialidades'
@@ -48,6 +53,10 @@ class Intervention(models.Model):
     room = models.ForeignKey(Room, verbose_name='Pabellón', on_delete=models.PROTECT)
     procedure = models.ForeignKey(Procedure, verbose_name='Tipo de operación', on_delete=models.PROTECT)
     doctor = models.ForeignKey(Doctor, verbose_name='Médico principal', on_delete=models.PROTECT)
+    anesthetist = models.ForeignKey(
+        Doctor, verbose_name='Anestesista', related_name='anesthesia_interventions',
+        on_delete=models.PROTECT, null=True,
+    )
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)

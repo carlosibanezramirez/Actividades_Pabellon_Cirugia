@@ -29,8 +29,8 @@ Django y PostgreSQL. El código y sus ramas se mantienen en GitHub. El despliegu
 
 ## Requisitos
 
-- Acceso con usuario y contraseña; perfiles operador y administrador.
-- Selección de pabellón, tipo de operación y médico principal desde listas configurables.
+- Acceso con usuario y contraseña; asignación de uno o más perfiles al crear o editar usuarios.
+- Selección de pabellón, tipo de operación, médico principal y anestesista desde listas configurables. El anestesista es obligatorio en las nuevas intervenciones y debe tener una especialidad activa habilitada para anestesia.
 - Registro de fecha, hora y usuario responsable de cada evento.
 - Persistencia para retomar intervenciones en curso y consultar sus duraciones.
 - Correcciones administrativas con motivo obligatorio y auditoría del valor original, valor nuevo, autor y momento del cambio.
