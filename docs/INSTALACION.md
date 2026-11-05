@@ -44,10 +44,12 @@ Las migraciones se ejecutan como tarea explícita antes de iniciar el servicio, 
 
 1. Entrar a `/admin/` con el superusuario.
 2. Configurar pabellones, tipos de operación y médicos. No se cargan listas ficticias automáticamente.
-3. Crear cuentas individuales y asignar el grupo **Operador** o **Administrador**.
+3. Crear cuentas individuales y seleccionar uno o más **Perfiles** desde el mismo formulario de creación. Los perfiles disponibles corresponden a los grupos (inicialmente **Operador** y **Administrador**) y sus permisos se acumulan. También se pueden modificar al editar el usuario; se exige al menos un perfil en estos formularios.
 4. Para administrar listas desde `/admin/`, el usuario del grupo Administrador debe tener además habilitado `staff`. Ese grupo no concede gestión de cuentas; el superusuario gestiona usuarios y contraseñas.
 5. Operadores pueden registrar y consultar todas las intervenciones de esta instalación. Administradores pueden corregir horarios con motivo obligatorio. No hay segregación por establecimiento en esta versión.
 6. Cada pabellón puede tener una sola intervención abierta. Al registrar la salida del paciente queda disponible para otra.
+7. En **Especialidades**, marcar **Habilita como anestesista** para las especialidades de anestesia. La actualización reconoce los nombres habituales ya existentes (Anestesia, Anestesista y Anestesiología, entre otros); si no encuentra ninguno, crea la opción Anestesia. Para otros nombres, revisar y activar la marca manualmente.
+8. Asignar a cada anestesista su especialidad desde **Médicos**. Al crear una intervención, el campo **Anestesista** es obligatorio y muestra únicamente médicos activos con especialidad activa habilitada para anestesia. El servidor también comprueba esta condición al guardar. Las intervenciones anteriores conservan sus datos y muestran «No registrado (intervención anterior)» si no tenían anestesista.
 
 Verificar una intervención ficticia completa, el rechazo de un salto de etapa, la consulta posterior y una corrección auditada antes de usar el sistema con actividad real. Los botones guardan el momento de la pulsación; no se ingresan horas manualmente durante el registro normal.
 

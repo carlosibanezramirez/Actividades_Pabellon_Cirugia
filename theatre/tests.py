@@ -13,8 +13,9 @@ from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Correction, Doctor, Event, Intervention, Procedure, Room
+from .models import Correction, Doctor, Event, Intervention, Procedure, Room, Specialty
 from .services import correct_event, create_intervention, record_event
+from .forms import InterventionForm
 
 
 def fixtures():
@@ -26,7 +27,9 @@ def fixtures():
     room = Room.objects.create(name='Pabellón de prueba')
     procedure = Procedure.objects.create(name='Operación ficticia')
     doctor = Doctor.objects.create(name='Profesional de prueba')
-    intervention = create_intervention(user=user, room=room, procedure=procedure, doctor=doctor)
+    specialty = Specialty.objects.create(name='Anestesia de prueba', is_anesthesia=True)
+    anesthetist = Doctor.objects.create(name='Anestesista de prueba', specialty=specialty)
+    intervention = create_intervention(user=user, room=room, procedure=procedure, doctor=doctor, anesthetist=anesthetist)
     return user, administrator, intervention
 
 
@@ -56,7 +59,7 @@ class WorkflowTests(TestCase):
         self.assertContains(response, '9 de 9')
         self.assertContains(response, '0:08:00')
         self.assertNotContains(response, 'action="' + reverse('record', args=[self.intervention.pk, 9]) + '"')
-        other = create_intervention(user=self.user, room=self.intervention.room, procedure=self.intervention.procedure, doctor=self.intervention.doctor)
+        other = create_intervention(user=self.user, room=self.intervention.room, procedure=self.intervention.procedure, doctor=self.intervention.doctor, anesthetist=self.intervention.anesthetist)
         self.assertNotEqual(other.pk, self.intervention.pk)
 
     def test_skipped_duplicate_and_after_completion_rejected(self):
@@ -106,21 +109,59 @@ class WorkflowTests(TestCase):
 
     def test_room_occupancy_and_inactive_catalog(self):
         with self.assertRaises(ValidationError):
-            create_intervention(user=self.user, room=self.intervention.room, procedure=self.intervention.procedure, doctor=self.intervention.doctor)
+            create_intervention(user=self.user, room=self.intervention.room, procedure=self.intervention.procedure, doctor=self.intervention.doctor, anesthetist=self.intervention.anesthetist)
         room = Room.objects.create(name='Inactivo', active=False)
         with self.assertRaises(ValidationError):
-            create_intervention(user=self.user, room=room, procedure=self.intervention.procedure, doctor=self.intervention.doctor)
+            create_intervention(user=self.user, room=room, procedure=self.intervention.procedure, doctor=self.intervention.doctor, anesthetist=self.intervention.anesthetist)
         response = self.client.get(reverse('create'))
         self.assertNotContains(response, '>Inactivo</option>')
 
     def test_create_page_submission_and_validation(self):
         room = Room.objects.create(name='Segundo pabellón')
-        response = self.client.post(reverse('create'), {'room': room.pk, 'procedure': self.intervention.procedure_id, 'doctor': self.intervention.doctor_id})
+        response = self.client.post(reverse('create'), {'room': room.pk, 'procedure': self.intervention.procedure_id, 'doctor': self.intervention.doctor_id, 'anesthetist': self.intervention.anesthetist_id})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Intervention.objects.count(), 2)
-        response = self.client.post(reverse('create'), {'room': room.pk, 'procedure': self.intervention.procedure_id, 'doctor': self.intervention.doctor_id})
+        response = self.client.post(reverse('create'), {'room': room.pk, 'procedure': self.intervention.procedure_id, 'doctor': self.intervention.doctor_id, 'anesthetist': self.intervention.anesthetist_id})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'ya tiene una intervención en curso')
+
+    def test_anesthetist_required_and_other_specialties_rejected(self):
+        room = Room.objects.create(name='Pabellón anestesia')
+        data = {'room': room.pk, 'procedure': self.intervention.procedure_id, 'doctor': self.intervention.doctor_id}
+        response = self.client.post(reverse('create'), data)
+        self.assertFormError(response.context['form'], 'anesthetist', 'Este campo es obligatorio.')
+        data['anesthetist'] = self.intervention.doctor_id
+        response = self.client.post(reverse('create'), data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('anesthetist', response.context['form'].errors)
+        with self.assertRaises(ValidationError):
+            create_intervention(user=self.user, room=room, procedure=self.intervention.procedure,
+                                doctor=self.intervention.doctor, anesthetist=self.intervention.doctor)
+        self.assertFalse(Intervention.objects.filter(room=room).exists())
+
+    def test_anesthetist_filter_excludes_inactive_doctors_and_specialties(self):
+        eligible = self.intervention.anesthetist
+        self.assertIn(eligible, InterventionForm().fields['anesthetist'].queryset)
+        self.assertNotIn(self.intervention.doctor, InterventionForm().fields['anesthetist'].queryset)
+        eligible.active = False
+        eligible.save()
+        self.assertNotIn(eligible, InterventionForm().fields['anesthetist'].queryset)
+        eligible.active = True
+        eligible.save()
+        eligible.specialty.active = False
+        eligible.specialty.save()
+        self.assertNotIn(eligible, InterventionForm().fields['anesthetist'].queryset)
+        with self.assertRaises(ValidationError):
+            create_intervention(user=self.user, room=Room.objects.create(name='Otro pabellón'),
+                                procedure=self.intervention.procedure, doctor=self.intervention.doctor,
+                                anesthetist=eligible)
+
+    def test_anesthetist_is_shown_and_old_intervention_remains_accessible(self):
+        url = reverse('detail', args=[self.intervention.pk])
+        self.assertContains(self.client.get(url), 'Anestesista de prueba')
+        Intervention.objects.filter(pk=self.intervention.pk).update(anesthetist=None)
+        self.assertContains(self.client.get(url), 'No registrado (intervención anterior)')
+        self.record(1)
 
     def test_future_clock_regression_rejected(self):
         self.record(1)
@@ -197,6 +238,61 @@ class WorkflowTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
+class UserProfileTests(TestCase):
+    def setUp(self):
+        call_command('setup_roles', verbosity=0)
+        self.superuser = get_user_model().objects.create_superuser(username='gestor', password='test-only-password')
+        self.client.force_login(self.superuser)
+        self.operator = Group.objects.get(name='Operador')
+        self.administrator = Group.objects.get(name='Administrador')
+
+    def user_data(self, groups):
+        return {'username': 'nuevo-usuario', 'usable_password': 'true',
+                'password1': 'ClaveDePrueba-7942!', 'password2': 'ClaveDePrueba-7942!',
+                'groups': groups, '_save': 'Guardar'}
+
+    def test_create_with_multiple_profiles_and_edit_selection(self):
+        response = self.client.get(reverse('admin:auth_user_add'))
+        self.assertContains(response, 'Perfiles')
+        self.assertContains(response, 'type="checkbox"')
+        response = self.client.post(reverse('admin:auth_user_add'),
+                                    self.user_data([self.operator.pk, self.administrator.pk]))
+        self.assertEqual(response.status_code, 302)
+        user = get_user_model().objects.get(username='nuevo-usuario')
+        self.assertTrue(user.check_password('ClaveDePrueba-7942!'))
+        self.assertCountEqual(user.groups.all(), [self.operator, self.administrator])
+        self.assertTrue(user.has_perm('theatre.operate_intervention'))
+        self.assertTrue(user.has_perm('theatre.correct_event'))
+        response = self.client.get(reverse('admin:auth_user_change', args=[user.pk]))
+        self.assertCountEqual(response.context['adminform'].form.initial['groups'],
+                              [self.operator, self.administrator])
+        from .forms import ProfileUserChangeForm
+        form = ProfileUserChangeForm(instance=user, data={
+            'username': user.username, 'groups': [self.operator.pk], 'is_active': True,
+            'date_joined': user.date_joined.isoformat(),
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        user = get_user_model().objects.get(pk=user.pk)
+        self.assertCountEqual(user.groups.all(), [self.operator])
+        self.assertFalse(user.has_perm('theatre.correct_event'))
+
+    def test_creation_requires_at_least_one_valid_profile(self):
+        for groups in ([], [999999]):
+            response = self.client.post(reverse('admin:auth_user_add'), self.user_data(groups))
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('groups', response.context['adminform'].form.errors)
+            self.assertFalse(get_user_model().objects.filter(username='nuevo-usuario').exists())
+
+    def test_operator_cannot_create_users_or_assign_profiles(self):
+        user = get_user_model().objects.create_user(username='solo-operador', password='test-only-password')
+        user.groups.add(self.operator)
+        self.client.force_login(user)
+        response = self.client.post(reverse('admin:auth_user_add'), self.user_data([self.administrator.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(get_user_model().objects.filter(username='nuevo-usuario').exists())
+
+
 @skipUnless(connection.vendor == 'postgresql', 'Requiere bloqueo de filas real en PostgreSQL')
 class ConcurrencyTests(TransactionTestCase):
     def setUp(self):
@@ -227,5 +323,5 @@ class ConcurrencyTests(TransactionTestCase):
 
     def test_simultaneous_room_assignment_creates_once(self):
         room = Room.objects.create(name='Pabellón concurrente')
-        self.run_parallel(lambda user: create_intervention(user=user, room=room, procedure=self.intervention.procedure, doctor=self.intervention.doctor))
+        self.run_parallel(lambda user: create_intervention(user=user, room=room, procedure=self.intervention.procedure, doctor=self.intervention.doctor, anesthetist=self.intervention.anesthetist))
         self.assertEqual(Intervention.objects.filter(room=room).count(), 1)

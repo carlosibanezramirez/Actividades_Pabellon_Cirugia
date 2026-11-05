@@ -1,13 +1,36 @@
 from django.contrib import admin
+from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin
 from django.db.models import Q
+from .forms import ProfileUserChangeForm, ProfileUserCreationForm
 from .models import Correction, Doctor, Event, Intervention, Procedure, Room, Specialty
 
 
-@admin.register(Room, Procedure, Specialty)
+@admin.register(Room, Procedure)
 class CatalogAdmin(admin.ModelAdmin):
     list_display = ['name', 'active']
     list_filter = ['active']
     search_fields = ['name']
+
+
+@admin.register(Specialty)
+class SpecialtyAdmin(CatalogAdmin):
+    list_display = ['name', 'is_anesthesia', 'active']
+    list_filter = ['active', 'is_anesthesia']
+
+
+admin.site.unregister(get_user_model())
+
+
+@admin.register(get_user_model())
+class ProfileUserAdmin(UserAdmin):
+    add_form = ProfileUserCreationForm
+    form = ProfileUserChangeForm
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        ('Datos personales', {'fields': ('first_name', 'last_name', 'email')}),
+        ('Perfiles', {'fields': ('groups', 'is_staff')}),
+    )
+    filter_horizontal = ('user_permissions',)
 
 
 @admin.register(Doctor)
@@ -41,7 +64,7 @@ class ReadOnlyAdmin(admin.ModelAdmin):
 
 @admin.register(Intervention)
 class InterventionAdmin(ReadOnlyAdmin):
-    list_display = ['id', 'room', 'procedure', 'doctor', 'created_at', 'completed_at']
+    list_display = ['id', 'room', 'procedure', 'doctor', 'anesthetist', 'created_at', 'completed_at']
     list_filter = ['room']
 
 
