@@ -11,6 +11,6 @@ class Command(BaseCommand):
         operator, _ = Group.objects.get_or_create(name='Operador')
         operator.permissions.set([operate])
         administrator, _ = Group.objects.get_or_create(name='Administrador')
-        catalog = Permission.objects.filter(content_type__app_label='theatre', content_type__model__in=['room', 'procedure', 'doctor'])
+        catalog = Permission.objects.filter(content_type__app_label='theatre', content_type__model__in=['room', 'procedure', 'doctor', 'specialty'])
         administrator.permissions.set([operate, correct, *catalog])
         self.stdout.write(self.style.SUCCESS('Perfiles preparados. Asigne los usuarios desde Administración.'))
