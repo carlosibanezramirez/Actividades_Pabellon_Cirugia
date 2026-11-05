@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pabellon}
+      POSTGRES_USER: ${POSTGRES_USER:-pabellon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD en .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [database]
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Configure DJANGO_SECRET_KEY en .env}
+      DJANGO_ALLOWED_HOSTS: ${APP_DOMAIN:?Configure APP_DOMAIN en .env}
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://${APP_DOMAIN}
+      DJANGO_DEBUG: 'false'
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-pabellon}
+      POSTGRES_USER: ${POSTGRES_USER:-pabellon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [database, frontend]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Configure ACME_EMAIL en .env}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web]
+    networks: [frontend]
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+networks:
+  database:
+    internal: true
+  frontend:
