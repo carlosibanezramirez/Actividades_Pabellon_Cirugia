@@ -28,6 +28,8 @@ class Procedure(Catalog):
 
 
 class Doctor(Catalog):
+    specialty = models.CharField('Especialidad', max_length=160, blank=True)
+
     class Meta(Catalog.Meta):
         verbose_name = 'médico'
         verbose_name_plural = 'médicos'

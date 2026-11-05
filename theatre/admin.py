@@ -2,11 +2,18 @@ from django.contrib import admin
 from .models import Correction, Doctor, Event, Intervention, Procedure, Room
 
 
-@admin.register(Room, Procedure, Doctor)
+@admin.register(Room, Procedure)
 class CatalogAdmin(admin.ModelAdmin):
     list_display = ['name', 'active']
     list_filter = ['active']
     search_fields = ['name']
+
+
+@admin.register(Doctor)
+class DoctorAdmin(CatalogAdmin):
+    list_display = ['name', 'specialty', 'active']
+    list_filter = ['active', 'specialty']
+    search_fields = ['name', 'specialty']
 
 
 class ReadOnlyAdmin(admin.ModelAdmin):
