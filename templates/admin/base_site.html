@@ -1,0 +1,11 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'brand/surgeon.css' %}">
+{% endblock %}
+
+{% block branding %}
+<div id="site-name"><a class="surgeon-admin-brand" href="{% url 'admin:index' %}" aria-label="Surgeon · Administración"><img class="surgeon-logo" src="{% static 'brand/surgeon-logo.png' %}" alt="Surgeon" width="180" height="60"></a></div>
+{% endblock %}

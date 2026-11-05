@@ -1,3 +1,3 @@
-{% extends 'base.html' %}{% block title %}Ingresar · Pabellón{% endblock %}{% block content %}
+{% extends 'base.html' %}{% block title %}Ingresar · Surgeon{% endblock %}{% block content %}
 <section class="card narrow"><p class="eyebrow">ACCESO AL SISTEMA</p><h1>Bienvenido</h1><p class="muted">Ingresa con tu cuenta para registrar las actividades del pabellón.</p><form method="post">{% csrf_token %}{{ form.as_p }}{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}<button type="submit">Ingresar</button></form><p class="muted">Si necesitas una cuenta o restablecer tu contraseña, contacta al administrador.</p></section>
 {% endblock %}

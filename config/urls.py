@@ -9,5 +9,5 @@ urlpatterns = [
     path('clave/', auth_views.PasswordChangeView.as_view(template_name='registration/password_change.html', success_url='/'), name='password_change'),
     path('', include('theatre.urls')),
 ]
-admin.site.site_header = 'Administración del pabellón'
-admin.site.site_title = 'Pabellón'
+admin.site.site_header = 'Surgeon · Administración'
+admin.site.site_title = 'Surgeon'

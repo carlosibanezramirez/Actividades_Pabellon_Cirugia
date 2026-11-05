@@ -1,0 +1,33 @@
+.surgeon-logo {
+    display: block;
+    width: 240px;
+    max-width: 100%;
+    height: auto;
+}
+.brand.surgeon-brand {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    max-width: 100%;
+}
+.brand.surgeon-brand small {
+    margin: 4px 0 0;
+    font-size: 10px;
+    letter-spacing: .6px;
+    white-space: normal;
+    text-align: center;
+}
+#site-name .surgeon-admin-brand {
+    display: inline-block;
+    padding: 6px 12px;
+    background: #fff;
+    border-radius: 8px;
+}
+#site-name .surgeon-admin-brand img {
+    width: 180px;
+    height: auto;
+}
+@media (max-width: 740px) {
+    .surgeon-logo { width: 210px; }
+}
