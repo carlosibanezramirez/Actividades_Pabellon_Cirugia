@@ -27,8 +27,17 @@ class Procedure(Catalog):
         verbose_name_plural = 'tipos de operación'
 
 
+class Specialty(Catalog):
+    class Meta(Catalog.Meta):
+        verbose_name = 'especialidad'
+        verbose_name_plural = 'especialidades'
+
+
 class Doctor(Catalog):
-    specialty = models.CharField('Especialidad', max_length=160, blank=True)
+    specialty = models.ForeignKey(
+        Specialty, verbose_name='Especialidad', on_delete=models.PROTECT,
+        blank=True, null=True,
+    )
 
     class Meta(Catalog.Meta):
         verbose_name = 'médico'
