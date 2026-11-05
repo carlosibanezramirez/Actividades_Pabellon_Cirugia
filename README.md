@@ -4,7 +4,24 @@ Aplicación para registrar actividades de una intervención quirúrgica con secu
 
 ## Estado
 
-Especificaciones iniciales. La implementación está pendiente; todavía no existe una versión desplegable.
+Primera implementación disponible para validación en la rama `feature/base-aplicacion`. Incluye autenticación, listas administrables, registro secuencial y correcciones auditadas. No se ha desplegado en la VM.
+
+## Instalación y pruebas
+
+Consultar [la guía de instalación](docs/INSTALACION.md) para configurar la VM, HTTPS, usuarios y respaldos. La configuración real se mantiene fuera de GitHub.
+
+Con Python 3.12, un entorno virtual y PostgreSQL disponibles:
+
+```bash
+pip install -r requirements.txt
+# Configurar POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB,
+# POSTGRES_USER y POSTGRES_PASSWORD en el entorno local.
+python manage.py test --settings=config.test_settings
+```
+
+Usar una base de pruebas aislada: Django crea y elimina una base con prefijo `test_`. El usuario de pruebas necesita permiso para crear bases. No usar credenciales de producción.
+
+La comprobación rápida `TEST_SQLITE=1 python manage.py test --settings=config.test_settings` omite las pruebas de concurrencia. La integración continua usa PostgreSQL real para ejecutar la suite completa.
 
 ## Tecnología
 
