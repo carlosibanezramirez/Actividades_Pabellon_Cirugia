@@ -82,7 +82,7 @@ No automatizar el despliegue directo desde cada push. Si una migración modifica
 
 ## Límites de esta primera versión
 
-- No incluye pacientes, integración con sistemas hospitalarios, recuperación de contraseña por correo ni cancelación de intervenciones.
+- Las reservas incluyen nombre del paciente; no existe ficha clínica ni integración con sistemas hospitalarios. Tampoco se incluye recuperación de contraseña por correo ni cancelación de intervenciones.
 - Las correcciones cambian horarios de eventos existentes; no borran ni omiten etapas. Los eventos y auditorías son de solo lectura en el panel administrativo. Quien administre directamente la base puede alterar datos; la auditoría no es un registro externo inviolable.
 - Una intervención abierta creada por error requiere revisión administrativa; no se proporciona un botón para eliminarla.
 - Configurar monitoreo de disponibilidad, almacenamiento, respaldos y reloj según la operación del servidor.

@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Agenda y reservas · Surgeon{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'room-board.css' %}"><link rel="stylesheet" href="{% static 'agenda.css' %}">{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">PROGRAMACIÓN QUIRÚRGICA</p><h1>Agenda y reservas</h1><p class="muted">Selecciona horas consecutivas de un mismo pabellón. La reserva incluye la preparación y dura al menos una hora.</p></div></div>
+<form method="get" class="card agenda-date">{{ date_form.fecha.label_tag }}{{ date_form.fecha }}<button type="submit">Consultar fecha</button>{{ date_form.fecha.errors }}</form>
+{% if day %}
+<div class="agenda-heading"><h2>{{ day|date:'d/m/Y' }}</h2><span class="muted">Horario de Chile · Actualizado {{ snapshot_at|date:'H:i:s' }}</span></div>
+<div class="board-legend"><span><i class="legend-dot room-libre" aria-hidden="true"></i>Libre</span><span><i class="legend-dot room-preparacion" aria-hidden="true"></i>En preparación</span><span><i class="legend-dot room-procedimiento" aria-hidden="true"></i>En procedimiento</span><span><i class="legend-dot room-no_disponible" aria-hidden="true"></i>No disponible / reservado</span></div>
+<p class="muted">Las intervenciones sin salida registrada bloquean el resto del día actual. Cada bloque que toca una reserva o uso del pabellón queda ocupado completo; el uso mínimo considerado es de una hora. Solo se pueden reservar horas que aún no comienzan.</p>
+{% if schedule.slots|length != 24 %}<p class="message">Esta fecha tiene {{ schedule.slots|length }} horas por cambio de horario. Se indica el desplazamiento UTC para distinguir las horas.</p>{% endif %}
+<form method="post" id="reservation-form">{% csrf_token %}<input type="hidden" name="fecha" value="{{ day|date:'Y-m-d' }}">
+{{ form.non_field_errors }}{{ form.slots.errors }}
+{% for row in schedule.rows %}<section class="agenda-room" aria-labelledby="agenda-room-{{ row.room.pk }}"><h2 id="agenda-room-{{ row.room.pk }}">{{ row.room.name }}{% if not row.room.active %} <small class="muted">No disponible</small>{% endif %}</h2><div class="hour-grid">
+{% for cell in row.slots %}<label class="hour-choice {% if not cell.selectable %}disabled{% endif %}"><input type="checkbox" name="slots" value="{{ cell.value }}" data-room="{{ row.room.pk }}" data-index="{{ cell.index }}" data-room-name="{{ row.room.name }}" data-label="{{ cell.time_label }}" {% if cell.value in selected_slots %}checked{% endif %} {% if not cell.selectable %}disabled{% endif %}><span class="hour-card room-{{ cell.state }}"><span class="hour-marquee">{{ cell.label }}</span><span class="hour-body"><strong>{{ cell.time_label }}</strong>{% if schedule.slots|length != 24 %}<small>UTC {{ cell.offset }}</small>{% endif %}{% if cell.busy.intervention %}<small>{{ cell.busy.intervention.procedure }}</small><small>{{ cell.busy.intervention.doctor }}</small>{% elif cell.busy.reservation %}<small>Reserva #{{ cell.busy.reservation.pk }}</small><small>{{ cell.busy.reservation.doctor }}</small><small>{{ cell.busy.reservation.procedure }}</small>{% endif %}{% if cell.past %}<small>Hora iniciada / pasada</small>{% elif cell.selectable %}<small class="select-hint">Seleccionar hora</small>{% endif %}<span class="selected-hint">✓ Seleccionada</span></span></span></label>{% endfor %}
+</div></section>{% empty %}<section class="card empty"><h2>No hay pabellones configurados</h2></section>{% endfor %}
+<section class="card reserve-details" id="datos-reserva"><p class="eyebrow">DATOS DE LA RESERVA</p><h2>Registrar reserva</h2><p id="selection-summary" role="status" aria-live="polite">Selecciona una o más horas consecutivas en las tarjetas de un pabellón.</p><p class="muted">Puedes seleccionar bloques contiguos para extender la reserva. Se validará nuevamente la disponibilidad al guardar.</p>
+<div class="booking-fields"><div>{{ form.doctor.label_tag }}{{ form.doctor }}{{ form.doctor.errors }}</div><div>{{ form.procedure.label_tag }}{{ form.procedure }}{{ form.procedure.errors }}</div><div>{{ form.patient_name.label_tag }}{{ form.patient_name }}{{ form.patient_name.errors }}</div></div><button type="submit">Confirmar reserva</button></section>
+</form>
+<section class="dashboard-section"><h2>Reservas de esta fecha</h2><div class="reservation-list">{% for booking in schedule.reservations %}<article class="card"><h3>{{ booking.room }} · {{ booking.starts_at|date:'H:i' }}–{{ booking.ends_at|date:'H:i' }}</h3><p>{{ booking.doctor }} · {{ booking.procedure }}</p><a href="{% url 'reservation_detail' booking.pk %}">Ver reserva #{{ booking.pk }} →</a></article>{% empty %}<p class="muted">No hay reservas registradas para esta fecha.</p>{% endfor %}</div></section>
+{% endif %}
+<script src="{% static 'agenda.js' %}" defer></script>
+{% endblock %}

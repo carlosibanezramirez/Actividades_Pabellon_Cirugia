@@ -1,3 +1,4 @@
+from datetime import timedelta
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
@@ -49,7 +50,34 @@ class Doctor(Catalog):
         verbose_name_plural = 'médicos'
 
 
+class Reservation(models.Model):
+    room = models.ForeignKey(Room, verbose_name='Pabellón', on_delete=models.PROTECT)
+    doctor = models.ForeignKey(Doctor, verbose_name='Médico solicitante', on_delete=models.PROTECT)
+    procedure = models.ForeignKey(Procedure, verbose_name='Tipo de cirugía', on_delete=models.PROTECT)
+    patient_name = models.CharField('Nombre del paciente', max_length=180)
+    starts_at = models.DateTimeField('Inicio reservado', db_index=True)
+    ends_at = models.DateTimeField('Término reservado', db_index=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['starts_at', 'pk']
+        verbose_name = 'reserva'
+        verbose_name_plural = 'reservas'
+        constraints = [models.CheckConstraint(
+            condition=Q(ends_at__gte=models.F('starts_at') + timedelta(hours=1)),
+            name='reservation_minimum_one_hour',
+        )]
+
+    def __str__(self):
+        return f'Reserva #{self.pk} · {self.room}'
+
+
 class Intervention(models.Model):
+    reservation = models.OneToOneField(
+        Reservation, verbose_name='Reserva', related_name='intervention',
+        null=True, blank=True, on_delete=models.PROTECT,
+    )
     room = models.ForeignKey(Room, verbose_name='Pabellón', on_delete=models.PROTECT)
     procedure = models.ForeignKey(Procedure, verbose_name='Tipo de operación', on_delete=models.PROTECT)
     doctor = models.ForeignKey(Doctor, verbose_name='Médico principal', on_delete=models.PROTECT)

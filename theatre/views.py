@@ -3,13 +3,16 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
 from django.utils import timezone
 from urllib.parse import urlencode
-from .forms import CorrectionForm, DashboardFilterForm, InterventionForm
+from .forms import AgendaDateForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm
 from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
-from .models import Event, Intervention
+from .models import Event, Intervention, Reservation
+from .scheduling import availability, reserve_hours
 from .services import correct_event, create_intervention, record_event
 
 
@@ -18,6 +21,43 @@ from .services import correct_event, create_intervention, record_event
 def board(request):
     return render(request, 'theatre/room_board.html', {
         'cards': room_board(), 'snapshot_at': timezone.now(),
+    })
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def agenda(request):
+    dates = request.POST if request.method == 'POST' else {'fecha': request.GET.get('fecha', timezone.localdate().isoformat())}
+    date_form = AgendaDateForm(dates)
+    day = date_form.cleaned_data['fecha'] if date_form.is_valid() else None
+    form = ReservationRequestForm(request.POST or None, day=day)
+    if request.method == 'POST' and day and form.is_valid():
+        try:
+            booking = reserve_hours(user=request.user, day=day, selections=form.cleaned_data['slots'],
+                                    doctor=form.cleaned_data['doctor'], procedure=form.cleaned_data['procedure'],
+                                    patient_name=form.cleaned_data['patient_name'])
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            messages.success(request, f'Reserva #{booking.pk} registrada correctamente.')
+            return redirect('reservation_detail', pk=booking.pk)
+    return render(request, 'theatre/agenda.html', {
+        'date_form': date_form, 'form': form, 'day': day,
+        'schedule': availability(day) if day else None,
+        'selected_slots': request.POST.getlist('slots') if request.method == 'POST' else [],
+        'snapshot_at': timezone.now(),
+    })
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def reservation_detail(request, pk):
+    booking = get_object_or_404(Reservation.objects.select_related('room', 'doctor', 'procedure', 'created_by', 'intervention'), pk=pk)
+    return render(request, 'theatre/reservation_detail.html', {
+        'booking': booking,
+        'can_start': not hasattr(booking, 'intervention') and booking.starts_at <= timezone.now() < booking.ends_at,
     })
 
 
@@ -63,7 +103,16 @@ def interventions(request):
 @login_required
 @permission_required('theatre.operate_intervention', raise_exception=True)
 def create(request):
-    form = InterventionForm(request.POST or None)
+    initial = {}
+    booking = None
+    if request.method == 'GET' and request.GET.get('reserva'):
+        try:
+            booking = get_object_or_404(Reservation, pk=int(request.GET['reserva']))
+        except (TypeError, ValueError):
+            raise Http404('Reserva no encontrada')
+        initial = {'room': booking.room_id, 'doctor': booking.doctor_id,
+                   'procedure': booking.procedure_id, 'reservation': booking.pk}
+    form = InterventionForm(request.POST or None, initial=initial)
     if request.method == 'POST' and form.is_valid():
         try:
             intervention = create_intervention(user=request.user, **form.cleaned_data)
@@ -73,13 +122,14 @@ def create(request):
             form.add_error(None, 'El pabellón ya tiene una intervención en curso.')
         else:
             return redirect('detail', pk=intervention.pk)
-    return render(request, 'theatre/create.html', {'form': form})
+    return render(request, 'theatre/create.html', {'form': form, 'booking': booking})
 
 
 @login_required
 @permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
 def detail(request, pk):
-    intervention = get_object_or_404(Intervention.objects.select_related('room', 'procedure', 'doctor', 'anesthetist', 'created_by'), pk=pk)
+    intervention = get_object_or_404(Intervention.objects.select_related('room', 'procedure', 'doctor', 'anesthetist', 'created_by', 'reservation'), pk=pk)
     events = list(intervention.events.select_related('recorded_by').prefetch_related('corrections__corrected_by'))
     by_stage = {e.stage: e for e in events}
     rows = []

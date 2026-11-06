@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group
-from .models import Doctor, Intervention, Procedure, Room
+from .models import Doctor, Intervention, Procedure, Reservation, Room
 
 
 def profile_field():
@@ -29,7 +29,8 @@ def eligible_anesthetists():
 class InterventionForm(forms.ModelForm):
     class Meta:
         model = Intervention
-        fields = ['room', 'procedure', 'doctor', 'anesthetist']
+        fields = ['room', 'procedure', 'doctor', 'anesthetist', 'reservation']
+        widgets = {'reservation': forms.HiddenInput()}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -65,3 +66,31 @@ class DashboardFilterForm(forms.Form):
         if end and end.year >= 9999:
             self.add_error('hasta', 'Seleccione una fecha anterior al año 9999.')
         return cleaned
+
+
+class AgendaDateForm(forms.Form):
+    fecha = forms.DateField(label='Fecha', widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'))
+
+    def clean_fecha(self):
+        day = self.cleaned_data['fecha']
+        if not 1900 <= day.year <= 9998:
+            raise forms.ValidationError('Seleccione una fecha entre los años 1900 y 9998.')
+        return day
+
+
+class ReservationRequestForm(forms.Form):
+    slots = forms.MultipleChoiceField(label='Horas seleccionadas', choices=[], required=True)
+    doctor = forms.ModelChoiceField(label='Médico solicitante', queryset=Doctor.objects.filter(active=True))
+    procedure = forms.ModelChoiceField(label='Tipo de cirugía', queryset=Procedure.objects.filter(active=True))
+    patient_name = forms.CharField(label='Nombre del paciente', max_length=180)
+
+    def __init__(self, *args, day=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if day:
+            from .scheduling import day_slots
+            slots = day_slots(day)
+            self.fields['slots'].choices = [
+                (f'{room_id}:{slot["index"]}', slot['label'])
+                for room_id in Room.objects.values_list('pk', flat=True)
+                for slot in slots
+            ]

@@ -1,7 +1,7 @@
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
-from .models import Correction, Doctor, Event, Intervention, Procedure, Room
+from .models import Correction, Doctor, Event, Intervention, Procedure, Reservation, Room
 
 
 def require_permission(user, permission):
@@ -10,7 +10,7 @@ def require_permission(user, permission):
 
 
 @transaction.atomic
-def create_intervention(*, user, room, procedure, doctor, anesthetist):
+def create_intervention(*, user, room, procedure, doctor, anesthetist, reservation=None):
     require_permission(user, 'theatre.operate_intervention')
     locked_room = Room.objects.select_for_update().get(pk=room.pk)
     if not locked_room.active or not Procedure.objects.get(pk=procedure.pk).active or not Doctor.objects.get(pk=doctor.pk).active:
@@ -21,7 +21,23 @@ def create_intervention(*, user, room, procedure, doctor, anesthetist):
         raise ValidationError('Seleccione un anestesista activo con especialidad habilitada para anestesia.')
     if Intervention.objects.filter(room=locked_room, completed_at__isnull=True).exists():
         raise ValidationError('Este pabellón ya tiene una intervención en curso. Retómela antes de crear otra.')
-    return Intervention.objects.create(room=locked_room, procedure=procedure, doctor=doctor, anesthetist=anesthetist, created_by=user)
+    from .scheduling import HOUR
+    now = timezone.now()
+    if reservation:
+        reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
+        if (reservation.room_id != locked_room.pk or reservation.doctor_id != doctor.pk
+                or reservation.procedure_id != procedure.pk):
+            raise ValidationError('El pabellón, médico y tipo de cirugía deben coincidir con la reserva.')
+        if not reservation.starts_at <= now < reservation.ends_at:
+            raise ValidationError('La intervención debe iniciarse dentro del horario reservado.')
+        if Intervention.objects.filter(reservation=reservation).exists():
+            raise ValidationError('La reserva ya tiene una intervención asociada.')
+    bookings = Reservation.objects.filter(room=locked_room, starts_at__lt=now + HOUR, ends_at__gt=now)
+    if reservation:
+        bookings = bookings.exclude(pk=reservation.pk)
+    if bookings.exists():
+        raise ValidationError('El pabellón tiene una reserva que coincide con la próxima hora. Inicie desde su reserva o use otro horario.')
+    return Intervention.objects.create(room=locked_room, procedure=procedure, doctor=doctor, anesthetist=anesthetist, created_by=user, reservation=reservation)
 
 
 @transaction.atomic

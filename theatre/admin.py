@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 from django.db.models import Q
 from .forms import ProfileUserChangeForm, ProfileUserCreationForm
-from .models import Correction, Doctor, Event, Intervention, Procedure, Room, Specialty
+from .models import Correction, Doctor, Event, Intervention, Procedure, Reservation, Room, Specialty
 
 
 @admin.register(Room, Procedure)
@@ -76,3 +76,10 @@ class EventAdmin(ReadOnlyAdmin):
 @admin.register(Correction)
 class CorrectionAdmin(ReadOnlyAdmin):
     list_display = ['event', 'previous_at', 'new_at', 'reason', 'corrected_by', 'corrected_at']
+
+
+@admin.register(Reservation)
+class ReservationAdmin(ReadOnlyAdmin):
+    list_display = ['id', 'room', 'starts_at', 'ends_at', 'doctor', 'procedure', 'patient_name', 'created_by']
+    list_filter = ['room', 'doctor']
+    search_fields = ['patient_name', 'doctor__name']
