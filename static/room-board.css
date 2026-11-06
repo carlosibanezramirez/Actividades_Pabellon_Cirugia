@@ -1,0 +1,30 @@
+header { flex-wrap: wrap; }
+header nav { justify-content: flex-end; }
+.room-libre { --room-color: #15803d; }
+.room-preparacion { --room-color: #171717; }
+.room-procedimiento { --room-color: #b91c1c; }
+.room-no_disponible { --room-color: #795037; }
+.board-legend { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 26px; color: var(--muted); font-size: 13px; }
+.board-legend>span { display: inline-flex; gap: 8px; align-items: center; }
+.legend-dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--room-color); }
+.room-board { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,320px),1fr)); gap: 22px; align-items: stretch; }
+.room-tile { overflow: hidden; background: white; border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; box-shadow: 0 4px 18px #18313a06; }
+.room-marquee { padding: 14px 22px; background: var(--room-color); color: white; font-size: 14px; font-weight: 750; letter-spacing: .3px; display: flex; align-items: center; gap: 10px; }
+.marquee-dot { border: 2px solid currentColor; width: 9px; height: 9px; border-radius: 50%; }
+.room-tile-body { padding: 24px; flex: 1; display: flex; flex-direction: column; }
+.room-tile h2 { font-size: 24px; letter-spacing: -.3px; margin-bottom: 12px; overflow-wrap: anywhere; }
+.room-record { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+.room-reason { color: #65472f; background: #f7f0e9; border-radius: 6px; padding: 9px 12px; font-size: 12px; }
+.finished-badge { display: inline-block; align-self: flex-start; color: #126534; background: #e9f6ec; border: 1px solid #b8d9c1; border-radius: 6px; font-weight: 750; font-size: 13px; padding: 6px 10px; margin: 0 0 8px; }
+.room-data { margin: 18px 0 6px; }
+.room-data dt { font-size: 12px; }
+.room-data dd { font-size: 16px; font-weight: 650; margin: 4px 0 16px; overflow-wrap: anywhere; }
+.room-times { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-top: auto; }
+.room-times span,.room-times small { display: block; color: var(--muted); font-size: 11px; }
+.room-times strong { display: block; font-size: 23px; line-height: 1.4; font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
+.room-times strong.time-pending { font-size: 16px; font-weight: 500; color: var(--muted); padding: 5px 0; }
+.room-times small+small { margin-top: 6px; }
+.room-record-link { margin-top: 18px; font-size: 13px; font-weight: 650; }
+.room-no-record { color: var(--muted); }
+.room-board>.empty { grid-column: 1/-1; }
+@media(max-width:740px) { header nav { justify-content: flex-start; } .room-tile-body { padding: 20px; } }
