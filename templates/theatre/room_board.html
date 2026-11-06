@@ -12,7 +12,7 @@
     <div class="room-tile-body"><h2 id="room-{{ card.room.pk }}">{{ card.room.name }}</h2>
     {% if card.state_reason %}<p class="room-reason">{{ card.state_reason }}</p>{% endif %}
     {% if card.intervention %}
-        {% if card.finished %}<p class="finished-badge">✓ Finalizada</p><p class="muted">La operación ya terminó en este pabellón y el paciente salió.</p>{% else %}<p class="room-record">Intervención #{{ card.intervention.pk }}</p>{% endif %}
+        {% if card.finished %}<p class="finished-badge">✓ Finalizada</p>{% else %}<p class="room-record">Intervención #{{ card.intervention.pk }}</p>{% endif %}
         <dl class="room-data"><dt>Tipo de operación</dt><dd>{{ card.intervention.procedure }}</dd><dt>Médico responsable</dt><dd>{{ card.intervention.doctor }}</dd></dl>
         <div class="room-times"><div><span>Inicio de uso</span>{% if card.intervention.usage_started_at %}<strong>{{ card.intervention.usage_started_at|date:'H:i:s' }}</strong><small>{{ card.intervention.usage_started_at|date:'d/m/Y' }}</small>{% else %}<strong class="time-pending">Pendiente</strong>{% endif %}<small>Inicio de preparación</small></div><div><span>Término de uso</span>{% if card.intervention.usage_ended_at %}<strong>{{ card.intervention.usage_ended_at|date:'H:i:s' }}</strong><small>{{ card.intervention.usage_ended_at|date:'d/m/Y' }}</small>{% else %}<strong class="time-pending">Pendiente</strong>{% endif %}<small>Salida del paciente</small></div></div>
         <a class="room-record-link" href="{% url 'detail' card.intervention.pk %}">{% if card.finished %}Ver última intervención{% else %}Ver intervención{% endif %} →</a>
