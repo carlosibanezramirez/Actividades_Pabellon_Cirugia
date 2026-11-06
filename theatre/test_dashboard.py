@@ -37,13 +37,13 @@ class DashboardTests(TestCase):
         free = Room.objects.create(name='Libre')
         unavailable = Room.objects.create(name='No disponible', active=False)
         rows, counts = room_snapshot()
-        self.assertEqual(counts, {'libre': 1, 'preparacion': 1, 'procedimiento': 0, 'no_disponible': 1})
-        for stage in range(1, 5):
-            self.event(stage, timezone.now())
+        self.assertEqual(counts, {'libre': 1, 'preparacion': 0, 'procedimiento': 0, 'no_disponible': 2})
+        self.event(1, timezone.now())
         self.assertEqual(room_snapshot()[1]['preparacion'], 1)
-        self.event(5, timezone.now())
+        self.event(2, timezone.now())
+        self.assertEqual(room_snapshot()[1]['preparacion'], 0)
         self.assertEqual(room_snapshot()[1]['procedimiento'], 1)
-        for stage in range(6, 10):
+        for stage in range(3, 10):
             self.event(stage, timezone.now())
         self.intervention.completed_at = timezone.now()
         self.intervention.save(update_fields=['completed_at'])
@@ -52,6 +52,7 @@ class DashboardTests(TestCase):
 
     def test_state_click_keeps_dates_and_filters_current_room_details(self):
         Room.objects.create(name='Libre para seleccionar')
+        self.event(1, timezone.now())
         response = self.client.get(self.url, {'desde': '2020-01-01', 'hasta': '2020-01-31', 'estado': 'preparacion'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual([row['room'].pk for row in response.context['rooms']], [self.intervention.room_id])
@@ -68,12 +69,12 @@ class DashboardTests(TestCase):
         stats = event_statistics(date(2026, 8, 10), date(2026, 8, 10))
         self.assertEqual(stats['event_count'], 2)
         self.assertEqual(stats['intervention_count'], 1)
-        row = stats['rows'][1]
+        row = stats['rows'][0]
         self.assertEqual(row['events'], 1)
         self.assertEqual(row['samples'], 1)
         self.assertEqual(row['average'], '00:10:00')
-        self.assertEqual(stats['rows'][0]['average'], '—')
-        self.assertEqual(stats['rows'][3]['events'], 0)
+        self.assertEqual(stats['rows'][2]['average'], '—')
+        self.assertEqual(stats['rows'][2]['events'], 0)
 
     def test_average_minimum_maximum_zero_and_corrected_timestamps(self):
         start = datetime(2026, 8, 10, 10, tzinfo=CHILE)
@@ -83,14 +84,14 @@ class DashboardTests(TestCase):
         self.event(1, start, another)
         self.event(2, start + timedelta(minutes=20), another)
         stats = event_statistics(date(2026, 8, 10), date(2026, 8, 10))
-        row = stats['rows'][1]
+        row = stats['rows'][0]
         self.assertEqual((row['samples'], row['average'], row['minimum'], row['maximum']),
                          (2, '00:15:00', '00:10:00', '00:20:00'))
         second.occurred_at = start
         second.save(update_fields=['occurred_at'])
         stats = event_statistics(date(2026, 8, 10), date(2026, 8, 10))
-        self.assertEqual(stats['rows'][1]['minimum'], '00:00:00')
-        self.assertEqual(stats['rows'][1]['average'], '00:10:00')
+        self.assertEqual(stats['rows'][0]['minimum'], '00:00:00')
+        self.assertEqual(stats['rows'][0]['average'], '00:10:00')
         self.assertEqual(second.original_at, start + timedelta(minutes=10))
 
     def test_incomplete_intervals_not_counted_as_zero_and_negative_intervals_excluded(self):
@@ -100,9 +101,46 @@ class DashboardTests(TestCase):
         self.event(4, start + timedelta(minutes=1))
         stats = event_statistics(date(2026, 8, 10), date(2026, 8, 10))
         self.assertEqual(stats['invalid_count'], 1)
-        self.assertEqual(stats['rows'][1]['samples'], 0)
-        self.assertEqual(stats['rows'][3]['samples'], 0)
-        self.assertEqual(stats['rows'][3]['average'], '—')
+        self.assertEqual(stats['rows'][0]['samples'], 0)
+        self.assertEqual(stats['rows'][2]['samples'], 0)
+        self.assertEqual(stats['rows'][2]['average'], '—')
+
+    def test_six_clinical_measurements_use_their_exact_event_pairs(self):
+        start = datetime(2026, 8, 10, 10, tzinfo=CHILE)
+        minutes = [0, 10, 15, 25, 30, 35, 95, 105, 120]
+        for stage, minute in enumerate(minutes, start=1):
+            self.event(stage, start + timedelta(minutes=minute))
+        stats = event_statistics(date(2026, 8, 10), date(2026, 8, 10))
+        self.assertEqual(stats['event_count'], 9)
+        self.assertEqual(stats['exit_count'], 1)
+        self.assertEqual(len(stats['rows']), 6)
+        self.assertEqual([row['interval'] for row in stats['rows']],
+                         ['1 → 2', '2 → 3', '3 → 4', '5 → 8', '6 → 7', '8 → 9'])
+        self.assertEqual([row['average'] for row in stats['rows']],
+                         ['00:10:00', '00:05:00', '00:10:00', '01:15:00', '01:00:00', '00:15:00'])
+        self.assertTrue(all(row['samples'] == 1 for row in stats['rows']))
+        response = self.client.get(self.url, {'desde': '2026-08-10', 'hasta': '2026-08-10'})
+        self.assertContains(response, '5 → 8')
+        self.assertContains(response, '01:15:00')
+        self.assertContains(response, 'Inicio de procedimientos')
+
+    def test_anesthesia_requires_event_five_even_when_previous_event_exists(self):
+        start = datetime(2026, 8, 10, 10, tzinfo=CHILE)
+        self.event(7, start)
+        self.event(8, start + timedelta(minutes=10))
+        stats = event_statistics(date(2026, 8, 10), date(2026, 8, 10))
+        anesthesia = next(row for row in stats['rows'] if row['key'] == 'anestesia')
+        self.assertEqual(anesthesia['events'], 1)
+        self.assertEqual(anesthesia['samples'], 0)
+        self.assertEqual(anesthesia['average'], '—')
+
+    def test_anesthesia_closing_event_selects_period_and_start_may_be_on_previous_day(self):
+        self.event(5, datetime(2026, 8, 9, 23, 30, tzinfo=CHILE))
+        self.event(7, datetime(2026, 8, 10, 0, 20, tzinfo=CHILE))
+        self.event(8, datetime(2026, 8, 10, 0, 30, tzinfo=CHILE))
+        stats = event_statistics(date(2026, 8, 10), date(2026, 8, 10))
+        anesthesia = next(row for row in stats['rows'] if row['key'] == 'anestesia')
+        self.assertEqual(anesthesia['average'], '01:00:00')
 
     def test_unavailable_room_with_open_intervention_keeps_its_record(self):
         self.intervention.room.active = False
