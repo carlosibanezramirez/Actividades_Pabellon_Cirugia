@@ -84,7 +84,7 @@ class Event(models.Model):
 
     intervention = models.ForeignKey(Intervention, related_name='events', on_delete=models.PROTECT)
     stage = models.PositiveSmallIntegerField(choices=Stage.choices)
-    occurred_at = models.DateTimeField('Hora del evento')
+    occurred_at = models.DateTimeField('Hora del evento', db_index=True)
     original_at = models.DateTimeField('Hora original')
     recorded_at = models.DateTimeField(auto_now_add=True)
     recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)

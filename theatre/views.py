@@ -5,9 +5,38 @@ from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
-from .forms import CorrectionForm, InterventionForm
+from django.utils import timezone
+from urllib.parse import urlencode
+from .forms import CorrectionForm, DashboardFilterForm, InterventionForm
+from .dashboard import STATES, event_statistics, room_snapshot, state_links
 from .models import Event, Intervention
 from .services import correct_event, create_intervention, record_event
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+def dashboard(request):
+    today = timezone.localdate()
+    defaults = {'desde': today.replace(day=1).isoformat(), 'hasta': today.isoformat()}
+    data = request.GET if ('desde' in request.GET or 'hasta' in request.GET) else defaults
+    form = DashboardFilterForm(data)
+    selected = request.GET.get('estado', '')
+    if selected not in dict(STATES):
+        selected = ''
+    rooms, counts = room_snapshot()
+    dates = defaults
+    stats = None
+    if form.is_valid():
+        dates = {key: value.isoformat() for key, value in form.cleaned_data.items()}
+        stats = event_statistics(form.cleaned_data['desde'], form.cleaned_data['hasta'])
+    return render(request, 'theatre/dashboard.html', {
+        'form': form, 'stats': stats, 'snapshot_at': timezone.now(),
+        'total_rooms': len(rooms), 'cards': state_links(counts, dates, selected),
+        'rooms': [row for row in rooms if not selected or row['state'] == selected],
+        'selected': selected, 'selected_label': dict(STATES).get(selected, 'Todos los estados'),
+        'all_query': urlencode(dates),
+        'refresh_query': urlencode({**dates, **({'estado': selected} if selected else {})}),
+    })
 
 
 @login_required
