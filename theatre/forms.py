@@ -51,3 +51,17 @@ class CorrectionForm(forms.Form):
     )
     reason = forms.CharField(label='Motivo de la corrección', max_length=2000, widget=forms.Textarea(attrs={'rows': 3}))
     expected_at = forms.DateTimeField(widget=forms.HiddenInput)
+
+
+class DashboardFilterForm(forms.Form):
+    desde = forms.DateField(label='Desde', widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'))
+    hasta = forms.DateField(label='Hasta', widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'))
+
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get('desde'), cleaned.get('hasta')
+        if start and end and start > end:
+            self.add_error('hasta', 'La fecha final debe ser igual o posterior a la fecha inicial.')
+        if end and end.year >= 9999:
+            self.add_error('hasta', 'Seleccione una fecha anterior al año 9999.')
+        return cleaned
