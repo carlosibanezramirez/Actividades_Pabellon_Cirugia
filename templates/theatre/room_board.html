@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Pabellones · Surgeon{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'room-board.css' %}">{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">VISTA DE PABELLONES</p><h1>Pabellones y su estado</h1><p class="muted">Actualizado: {{ snapshot_at|date:'d/m/Y H:i:s' }} · Horario de Chile</p></div><a class="button secondary" href="{% url 'room_board' %}">Actualizar</a></div>
+<div class="board-legend" aria-label="Colores de estado"><span><i class="legend-dot room-libre" aria-hidden="true"></i>Libre</span><span><i class="legend-dot room-preparacion" aria-hidden="true"></i>En preparación</span><span><i class="legend-dot room-procedimiento" aria-hidden="true"></i>En procedimiento</span><span><i class="legend-dot room-no_disponible" aria-hidden="true"></i>No disponible</span></div>
+<div class="room-board">
+{% for card in cards %}
+<article class="room-tile room-{{ card.state }}" aria-labelledby="room-{{ card.room.pk }}">
+    <div class="room-marquee"><span class="marquee-dot" aria-hidden="true"></span>{{ card.state_label }}</div>
+    <div class="room-tile-body"><h2 id="room-{{ card.room.pk }}">{{ card.room.name }}</h2>
+    {% if card.state_reason %}<p class="room-reason">{{ card.state_reason }}</p>{% endif %}
+    {% if card.intervention %}
+        {% if card.finished %}<p class="finished-badge">✓ Finalizada</p>{% else %}<p class="room-record">Intervención #{{ card.intervention.pk }}</p>{% endif %}
+        <dl class="room-data"><dt>Tipo de operación</dt><dd>{{ card.intervention.procedure }}</dd><dt>Médico responsable</dt><dd>{{ card.intervention.doctor }}</dd></dl>
+        <div class="room-times"><div><span>Inicio de uso</span>{% if card.intervention.usage_started_at %}<strong>{{ card.intervention.usage_started_at|date:'H:i:s' }}</strong><small>{{ card.intervention.usage_started_at|date:'d/m/Y' }}</small>{% else %}<strong class="time-pending">Pendiente</strong>{% endif %}<small>Inicio de preparación</small></div><div><span>Término de uso</span>{% if card.intervention.usage_ended_at %}<strong>{{ card.intervention.usage_ended_at|date:'H:i:s' }}</strong><small>{{ card.intervention.usage_ended_at|date:'d/m/Y' }}</small>{% else %}<strong class="time-pending">Pendiente</strong>{% endif %}<small>Salida del paciente</small></div></div>
+        <a class="room-record-link" href="{% url 'detail' card.intervention.pk %}">{% if card.finished %}Ver última intervención{% else %}Ver intervención{% endif %} →</a>
+    {% else %}
+        <div class="room-no-record"><p>Sin intervenciones registradas</p><dl class="room-data"><dt>Tipo de operación</dt><dd>—</dd><dt>Médico responsable</dt><dd>—</dd><dt>Inicio / término de uso</dt><dd>—</dd></dl></div>
+    {% endif %}
+    </div>
+</article>
+{% empty %}<section class="card empty"><h2>No hay pabellones configurados</h2><p class="muted">Solicita al administrador que agregue los pabellones al catálogo.</p></section>{% endfor %}
+</div>
+{% endblock %}

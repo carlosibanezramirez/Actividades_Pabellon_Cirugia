@@ -10,6 +10,8 @@ Primera implementación disponible para validación en la rama `feature/base-apl
 
 El [panel de control](docs/PANEL.md) está disponible en `/panel/`, con estados actuales de pabellones, detalle por estado y estadísticas de tiempos entre fechas de calendario.
 
+El [tablero de pabellones](docs/TABLERO.md), en `/pabellones/`, muestra tarjetas con marquesinas de color, operación, médico responsable, horarios de uso y la última intervención finalizada.
+
 Consultar [la guía de instalación](docs/INSTALACION.md) para configurar la VM, HTTPS, usuarios y respaldos. La configuración real se mantiene fuera de GitHub.
 
 Con Python 3.12, un entorno virtual y PostgreSQL disponibles:

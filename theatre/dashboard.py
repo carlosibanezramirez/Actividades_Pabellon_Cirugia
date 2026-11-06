@@ -40,6 +40,18 @@ def duration_label(seconds):
     return f'{hours:02d}:{minutes:02d}:{seconds:02d}'
 
 
+def current_room_state(room, intervention, stage):
+    if not room.active:
+        return 'no_disponible', 'Desactivado en Administración'
+    if not intervention or intervention.completed_at or stage == Event.Stage.PATIENT_EXIT:
+        return 'libre', ''
+    if stage == Event.Stage.ROOM_START:
+        return 'preparacion', ''
+    if stage and stage >= Event.Stage.ROOM_END:
+        return 'procedimiento', ''
+    return 'no_disponible', 'Intervención reservada, pendiente de inicio de preparación'
+
+
 def room_snapshot():
     opened = {
         item.room_id: item for item in Intervention.objects.filter(completed_at__isnull=True)
@@ -51,19 +63,7 @@ def room_snapshot():
     for room in Room.objects.all():
         intervention = opened.get(room.pk)
         stage = intervention.last_stage if intervention else None
-        reason = ''
-        if not room.active:
-            state = 'no_disponible'
-            reason = 'Desactivado en Administración'
-        elif not intervention:
-            state = 'libre'
-        elif stage == Event.Stage.ROOM_START:
-            state = 'preparacion'
-        elif stage and stage >= Event.Stage.ROOM_END:
-            state = 'procedimiento'
-        else:
-            state = 'no_disponible'
-            reason = 'Intervención reservada, pendiente de inicio de preparación'
+        state, reason = current_room_state(room, intervention, stage)
         counts[state] += 1
         rows.append({
             'room': room, 'state': state, 'state_label': dict(STATES)[state],
@@ -72,6 +72,35 @@ def room_snapshot():
             'last_event': Event.Stage(stage).label if stage else ('Sin eventos registrados' if intervention else '—'),
         })
     return rows, counts
+
+
+def room_board():
+    # Mostrar la intervención abierta o, si no existe, la última realizada.
+    latest = Intervention.objects.filter(room_id=OuterRef('pk')).annotate(
+        open_priority=Case(When(completed_at__isnull=True, then=Value(0)), default=Value(1)),
+    ).order_by('open_priority', '-completed_at', '-created_at', '-pk').values('pk')[:1]
+    rooms = list(Room.objects.annotate(board_intervention_id=Subquery(latest)))
+    event_time = Event.objects.filter(intervention_id=OuterRef('pk'))
+    interventions = {
+        item.pk: item for item in Intervention.objects.filter(
+            pk__in=[room.board_intervention_id for room in rooms if room.board_intervention_id],
+        ).select_related('procedure', 'doctor').annotate(
+            last_stage=Max('events__stage'),
+            usage_started_at=Subquery(event_time.filter(stage=Event.Stage.ROOM_START).values('occurred_at')[:1]),
+            usage_ended_at=Subquery(event_time.filter(stage=Event.Stage.PATIENT_EXIT).values('occurred_at')[:1]),
+        )
+    }
+    cards = []
+    for room in rooms:
+        item = interventions.get(room.board_intervention_id)
+        stage = item.last_stage if item else None
+        state, reason = current_room_state(room, item, stage)
+        cards.append({
+            'room': room, 'state': state, 'state_label': dict(STATES)[state],
+            'state_reason': reason, 'intervention': item,
+            'finished': bool(item and item.usage_ended_at),
+        })
+    return cards
 
 
 def event_statistics(start_date, end_date):

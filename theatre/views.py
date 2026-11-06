@@ -8,9 +8,17 @@ from django.views.decorators.http import require_POST
 from django.utils import timezone
 from urllib.parse import urlencode
 from .forms import CorrectionForm, DashboardFilterForm, InterventionForm
-from .dashboard import STATES, event_statistics, room_snapshot, state_links
+from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
 from .models import Event, Intervention
 from .services import correct_event, create_intervention, record_event
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+def board(request):
+    return render(request, 'theatre/room_board.html', {
+        'cards': room_board(), 'snapshot_at': timezone.now(),
+    })
 
 
 @login_required
