@@ -9,11 +9,65 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
 from django.utils import timezone
 from urllib.parse import urlencode
-from .forms import AgendaDateForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm
+from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm
 from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
-from .models import Event, Intervention, Reservation
+from .models import Event, Intervention, Reservation, Room
+from .weekly_scheduling import continuous_day, reserve_continuous, week_start
 from .scheduling import availability, reserve_hours
 from .services import correct_event, create_intervention, record_event
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def weekly_agenda(request):
+    from datetime import timedelta
+    initial_room = Room.objects.first()
+    params = request.GET if request.GET else {
+        'room': initial_room.pk if initial_room else '', 'fecha': timezone.localdate().isoformat(),
+    }
+    form = WeeklyAgendaForm(params)
+    context = {'form': form}
+    if form.is_valid():
+        room = form.cleaned_data['room']
+        monday = week_start(form.cleaned_data['fecha'])
+        context.update({
+            'room': room, 'monday': monday, 'sunday': monday + timedelta(days=6),
+            'days': [continuous_day(room, monday + timedelta(days=i)) for i in range(7)],
+            'previous_query': urlencode({'room': room.pk, 'fecha': (monday - timedelta(days=7)).isoformat()}),
+            'next_query': urlencode({'room': room.pk, 'fecha': (monday + timedelta(days=7)).isoformat()}),
+        })
+    return render(request, 'theatre/weekly_agenda.html', context)
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def weekly_day(request, room_id, day_string):
+    from datetime import date
+    room = get_object_or_404(Room, pk=room_id)
+    try:
+        day = date.fromisoformat(day_string)
+        if not 1900 <= day.year <= 9997:
+            raise ValueError
+    except ValueError:
+        raise Http404('Fecha no válida')
+    form = ContinuousReservationForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        try:
+            booking = reserve_continuous(user=request.user, room=room, day=day, **form.cleaned_data)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            start = timezone.localtime(booking.starts_at).strftime('%d/%m %H:%M')
+            end = timezone.localtime(booking.ends_at).strftime('%d/%m %H:%M')
+            messages.success(request, f'Reserva #{booking.pk} confirmada: {start}–{end}, incluidos los 15 minutos de preparación.')
+            return redirect('weekly_day', room_id=room.pk, day_string=day.isoformat())
+    return render(request, 'theatre/weekly_day.html', {
+        'room': room, 'day': continuous_day(room, day), 'form': form,
+        'week_query': urlencode({'room': room.pk, 'fecha': day.isoformat()}),
+        'can_book': room.active and day >= timezone.localdate(),
+    })
 
 
 @login_required

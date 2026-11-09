@@ -1,0 +1,101 @@
+from datetime import datetime, timedelta, timezone as datetime_timezone
+
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.forms import DateTimeField
+from django.utils import timezone
+
+from .models import Doctor, Procedure, Reservation, Room
+from .scheduling import occupancy
+from .services import require_permission
+
+
+PREPARATION = timedelta(minutes=15)
+WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+
+
+def week_start(day):
+    return day - timedelta(days=day.weekday())
+
+
+def continuous_day(room, day, now=None):
+    now = now or timezone.now()
+    slots, periods = occupancy(day, now, room.pk, minimum_use=timedelta(0))
+    start, end = slots[0]['start'], slots[-1]['end']
+    total = (end - start).total_seconds()
+    intervals = sorted((max(start, p['start']), min(end, p['end']))
+                       for p in periods if p['start'] < end and p['end'] > start)
+    merged = []
+    for left, right in intervals:
+        if right <= left:
+            continue
+        if merged and left <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], right))
+        else:
+            merged.append((left, right))
+    if not room.active:
+        merged = [(start, end)]
+    segments, cursor = [], start
+    for left, right in merged:
+        if cursor < left:
+            segments.append({'start': cursor, 'end': left, 'busy': False})
+        segments.append({'start': left, 'end': right, 'busy': True})
+        cursor = right
+    if cursor < end:
+        segments.append({'start': cursor, 'end': end, 'busy': False})
+    for segment in segments:
+        # CSS decimal con punto, independiente del formato numérico regional.
+        segment['top'] = f'{100 * (segment["start"] - start).total_seconds() / total:.6f}'
+        segment['height'] = f'{100 * (segment["end"] - segment["start"]).total_seconds() / total:.6f}'
+        segment['label'] = 'Reservado / ocupado' if segment['busy'] else 'Libre'
+        if not room.active:
+            segment['label'] = 'Pabellón no disponible'
+    ticks = [{'position': '0', 'label': timezone.localtime(start).strftime('%H:%M')}]
+    tz = timezone.get_current_timezone()
+    for hour in [6, 12, 18]:
+        tick = timezone.make_aware(datetime.combine(day, datetime.min.time().replace(hour=hour)), tz).astimezone(datetime_timezone.utc)
+        ticks.append({'position': f'{100 * (tick - start).total_seconds() / total:.6f}', 'label': f'{hour:02d}:00'})
+    ticks.append({'position': '100', 'label': '24:00'})
+    bookings = {p['reservation'].pk: p['reservation'] for p in periods if p['reservation']}
+    return {
+        'date': day, 'weekday': WEEKDAYS[day.weekday()], 'segments': segments,
+        'ticks': ticks, 'hours': int(total // 3600), 'active': room.active,
+        'free_minutes': int(sum((s['end'] - s['start']).total_seconds() for s in segments if not s['busy']) // 60),
+        'bookings': sorted(bookings.values(), key=lambda booking: (booking.starts_at, booking.pk)),
+    }
+
+
+@transaction.atomic
+def reserve_continuous(*, user, room, day, desired_time, duration_minutes, doctor, procedure, patient_name):
+    require_permission(user, 'theatre.operate_intervention')
+    if not 1900 <= day.year <= 9997:
+        raise ValidationError('Seleccione una fecha entre los años 1900 y 9997.')
+    if desired_time.minute not in (0, 30) or desired_time.second or desired_time.microsecond or desired_time.tzinfo:
+        raise ValidationError('El inicio solicitado debe ser a la hora o media hora: por ejemplo, 09:00 o 09:30.')
+    if isinstance(duration_minutes, bool) or not isinstance(duration_minutes, int) or not 1 <= duration_minutes <= 1440:
+        raise ValidationError('La duración debe ser un número entero entre 1 y 1440 minutos.')
+    # Django rechaza horas ambiguas o inexistentes durante cambios de horario.
+    planned = DateTimeField().clean(datetime.combine(day, desired_time)).astimezone(datetime_timezone.utc)
+    start, end = planned - PREPARATION, planned + timedelta(minutes=duration_minutes)
+    now = timezone.now()
+    if start < now:
+        raise ValidationError('El inicio de preparación (15 minutos antes) no puede estar en el pasado.')
+    patient_name = patient_name.strip()
+    if not patient_name or len(patient_name) > 180:
+        raise ValidationError('Ingrese el nombre del paciente (máximo 180 caracteres).')
+    locked_room = Room.objects.select_for_update().filter(pk=room.pk, active=True).first()
+    if locked_room is None:
+        raise ValidationError('El pabellón no está disponible.')
+    if not Doctor.objects.filter(pk=doctor.pk, active=True).exists() or not Procedure.objects.filter(pk=procedure.pk, active=True).exists():
+        raise ValidationError('Seleccione un médico y un tipo de cirugía activos.')
+    cursor = timezone.localdate(start)
+    last_day = timezone.localdate(end)
+    while cursor <= last_day:
+        _, periods = occupancy(cursor, now, locked_room.pk, minimum_use=timedelta(0))
+        if any(period['start'] < end and period['end'] > start for period in periods):
+            raise ValidationError('No hay espacio para el intervalo completo, incluidos los 15 minutos previos de preparación. Elija otro horario.')
+        cursor += timedelta(days=1)
+    return Reservation.objects.create(
+        room=locked_room, doctor=doctor, procedure=procedure, patient_name=patient_name,
+        starts_at=start, planned_start_at=planned, ends_at=end, created_by=user,
+    )

@@ -1,0 +1,4 @@
+<div class="continuous-timeline {% if not day.active %}inactive{% endif %}" aria-label="Disponibilidad continua del {{ day.date|date:'d/m/Y' }}">
+    <div class="timeline-spans">{% for segment in day.segments %}<span class="continuous-span {% if segment.busy %}occupied{% else %}free{% endif %}" style="top:{{ segment.top }}%;height:{{ segment.height }}%;" title="{{ segment.label }} · {{ segment.start|date:'d/m H:i' }}–{{ segment.end|date:'d/m H:i' }}"><span class="visually-hidden">{{ segment.label }}: {{ segment.start|date:'d/m H:i' }} a {{ segment.end|date:'d/m H:i' }}.</span></span>{% endfor %}</div>
+    <div class="time-ruler" aria-hidden="true">{% for tick in day.ticks %}<span style="top:{{ tick.position }}%;">{{ tick.label }}</span>{% endfor %}</div>
+</div>

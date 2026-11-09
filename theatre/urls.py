@@ -2,6 +2,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('agenda-semanal/', views.weekly_agenda, name='weekly_agenda'),
+    path('agenda-semanal/<int:room_id>/dia/<str:day_string>/', views.weekly_day, name='weekly_day'),
     path('agenda/', views.agenda, name='agenda'),
     path('reservas/<int:pk>/', views.reservation_detail, name='reservation_detail'),
     path('pabellones/', views.board, name='room_board'),
