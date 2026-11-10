@@ -28,17 +28,22 @@ class OperatingSettingsTests(TestCase):
 
     def test_default_configuration_and_admin_permissions(self):
         self.assertEqual((self.policy.preparation_mean_minutes, self.policy.preparation_max_minutes), (15, 30))
-        self.assertEqual((self.policy.opening_time, self.policy.closing_time), (time(7), time(23)))
+        self.assertEqual((self.item.room.opening_time, self.item.room.closing_time), (time(7), time(23)))
         self.assertFalse(self.user.has_perm('theatre.change_operatingsettings'))
         self.assertTrue(self.administrator.has_perm('theatre.change_operatingsettings'))
         self.client.force_login(self.administrator)
         url = reverse('admin:theatre_operatingsettings_change', args=[1])
         response = self.client.post(url, {'preparation_mean_minutes': 20, 'preparation_max_minutes': 40,
-                                          'opening_time': '08:00', 'closing_time': '22:00', '_save': 'Guardar'})
+                                          '_save': 'Guardar'})
         self.assertEqual(response.status_code, 302)
         self.policy.refresh_from_db()
         self.assertEqual(self.policy.preparation_mean_minutes, 20)
-        self.assertEqual(self.policy.opening_time, time(8))
+        room_url = reverse('admin:theatre_room_change', args=[self.item.room_id])
+        response = self.client.post(room_url, {'name': self.item.room.name, 'active': 'on',
+                                               'opening_time': '08:00', 'closing_time': '22:00', '_save': 'Guardar'})
+        self.assertEqual(response.status_code, 302)
+        self.item.room.refresh_from_db()
+        self.assertEqual(self.item.room.opening_time, time(8))
 
     def test_configuration_rejects_inverted_hours_and_invalid_thresholds(self):
         self.policy.preparation_mean_minutes = 20
@@ -46,12 +51,12 @@ class OperatingSettingsTests(TestCase):
         with self.assertRaises(ValidationError):
             self.policy.full_clean()
         self.policy.preparation_max_minutes = 30
-        self.policy.closing_time = time(6)
+        self.item.room.closing_time = time(6)
         with self.assertRaises(ValidationError):
-            self.policy.full_clean()
-        self.policy.closing_time = time(23, 0, 1)
+            self.item.room.full_clean()
+        self.item.room.closing_time = time(23, 0, 1)
         with self.assertRaises(ValidationError):
-            self.policy.full_clean()
+            self.item.room.full_clean()
 
     def test_changed_preparation_affects_new_reservations_only(self):
         old = self.reserve()

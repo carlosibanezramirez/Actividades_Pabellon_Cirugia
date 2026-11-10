@@ -11,7 +11,7 @@ from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Intervention, OperatingSettings, Reservation
+from .models import Intervention, Reservation
 from .scheduling import day_slots, reserve_hours
 from .services import create_intervention
 from .tests import fixtures
@@ -78,7 +78,7 @@ class WeeklySchedulingTests(TestCase):
         self.assertEqual(timezone.localtime(booking.starts_at).time(), time(9, 45))
 
     def test_preparation_checks_previous_day_and_is_shown_on_both_days(self):
-        policy = OperatingSettings.current()
+        policy = self.room
         policy.opening_time = time(0)
         policy.closing_time = time(23, 59)
         policy.save()

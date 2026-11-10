@@ -10,15 +10,13 @@ from .models import Correction, Doctor, Event, Intervention, OperatingSettings, 
 
 @admin.register(OperatingSettings)
 class OperatingSettingsAdmin(admin.ModelAdmin):
-    formfield_overrides = {models.TimeField: {'widget': forms.TimeInput(format='%H:%M', attrs={'type': 'time', 'step': 60})}}
     fieldsets = [
         ('Preparación del pabellón', {
             'fields': ['preparation_mean_minutes', 'preparation_max_minutes'],
             'description': 'La continuidad entre reservas mantiene un máximo de 30 minutos. Un tiempo medio mayor de 30 minutos impedirá encadenar reservas posteriores en el mismo día.',
         }),
-        ('Horario de reservas', {'fields': ['opening_time', 'closing_time']}),
     ]
-    list_display = ['__str__', 'preparation_mean_minutes', 'preparation_max_minutes', 'opening_time', 'closing_time']
+    list_display = ['__str__', 'preparation_mean_minutes', 'preparation_max_minutes']
 
     def has_add_permission(self, request):
         return False
@@ -27,11 +25,18 @@ class OperatingSettingsAdmin(admin.ModelAdmin):
         return False
 
 
-@admin.register(Room, Procedure)
+@admin.register(Procedure)
 class CatalogAdmin(admin.ModelAdmin):
     list_display = ['name', 'active']
     list_filter = ['active']
     search_fields = ['name']
+
+
+@admin.register(Room)
+class RoomAdmin(CatalogAdmin):
+    list_display = ['name', 'opening_time', 'closing_time', 'active']
+    fields = ['name', 'active', 'opening_time', 'closing_time']
+    formfield_overrides = {models.TimeField: {'widget': forms.TimeInput(format='%H:%M', attrs={'type': 'time', 'step': 60})}}
 
 
 @admin.register(Specialty)
