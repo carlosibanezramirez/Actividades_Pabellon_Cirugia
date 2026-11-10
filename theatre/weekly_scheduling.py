@@ -82,7 +82,9 @@ def continuous_day(room, day, now=None):
                 'height': f'{100 * (right - left).total_seconds() / total:.6f}',
                 'compact': (right - left).total_seconds() <= 90 * 60,
                 'parts': parts,
-                'duration_minutes': int((booking.ends_at - booking.starts_at).total_seconds() // 60),
+                'reservation_start': booking.planned_start_at or booking.starts_at,
+                'duration_minutes': int((booking.ends_at - (booking.planned_start_at or booking.starts_at)).total_seconds() // 60),
+                'total_duration_minutes': int((booking.ends_at - booking.starts_at).total_seconds() // 60),
             })
     return {
         'date': day, 'weekday': WEEKDAYS[day.weekday()], 'segments': segments,

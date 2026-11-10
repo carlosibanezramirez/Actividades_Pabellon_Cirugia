@@ -31,6 +31,7 @@
       ['Tipo de cirugía', block.dataset.surgery], ['Médico', block.dataset.doctor],
       ['Horario Tramo', block.dataset.phaseHours], ['Horario Reserva', block.dataset.hours],
       ['Duración Reserva', `${block.dataset.duration} minutos`],
+      ['Tiempo Total', `${block.dataset.totalDuration} minutos`],
       ['Paciente', block.dataset.patient], ['RUT', block.dataset.rut]];
     rows.forEach(([label, value]) => {
       const row = document.createElement('p');

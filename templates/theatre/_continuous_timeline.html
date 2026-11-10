@@ -6,10 +6,11 @@
     {% for part in block.parts %}
     <button type="button" class="reservation-block {% if part.compact %}compact{% endif %} {% if part.preparation %}preparation-block{% endif %}" style="top:{{ part.top }}%;height:{{ part.height }}%;" data-booking-tooltip
         data-phase="{% if part.preparation %}Preparación del pabellón (15 minutos previos){% else %}Intervención programada{% endif %}"
-        data-phase-hours="{{ part.start|date:'H:i' }} – {{ part.end|date:'H:i' }}"
+        data-phase-hours="{{ block.booking.starts_at|date:'H:i' }} – {{ block.booking.ends_at|date:'H:i' }}"
         data-surgery="{{ block.booking.procedure }}" data-doctor="{{ block.booking.doctor }}"
-        data-hours="{{ block.booking.starts_at|date:'H:i' }} – {{ block.booking.ends_at|date:'H:i' }}"
+        data-hours="{{ block.reservation_start|date:'H:i' }} – {{ block.booking.ends_at|date:'H:i' }}"
         data-duration="{{ block.duration_minutes }}"
+        data-total-duration="{{ block.total_duration_minutes }}"
         data-patient="{{ block.booking.patient_name }}" data-rut="{{ block.booking.patient_rut|default:'No registrado' }}"
         aria-label="Reserva #{{ block.booking.pk }}: {{ block.booking.procedure }}, {{ block.booking.doctor }}, {{ block.booking.starts_at|date:'H:i' }} a {{ block.booking.ends_at|date:'H:i' }}. Ver datos del paciente.">
         {% if not part.preparation %}<span class="reservation-block-title">{{ block.booking.procedure }}</span>

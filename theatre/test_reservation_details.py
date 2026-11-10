@@ -33,6 +33,18 @@ class ReservationDetailsTests(TestCase):
             with self.subTest(value=value), self.assertRaises(ValidationError):
                 normalize_rut(value)
 
+    def test_tooltip_separates_requested_time_from_total_unavailability(self):
+        self.reserve(desired_time=time(9, 30), duration_minutes=90)
+        block = continuous_day(self.item.room, self.day)['booking_blocks'][0]
+        self.assertEqual(block['duration_minutes'], 90)
+        self.assertEqual(block['total_duration_minutes'], 105)
+        self.assertEqual(timezone.localtime(block['reservation_start']).time(), time(9, 30))
+        response = self.client.get(reverse('weekly_day', args=[self.item.room_id, self.day.isoformat()]))
+        self.assertContains(response, 'data-phase-hours="09:15 – 11:00"', count=2)
+        self.assertContains(response, 'data-hours="09:30 – 11:00"', count=2)
+        self.assertContains(response, 'data-duration="90"', count=2)
+        self.assertContains(response, 'data-total-duration="105"', count=2)
+
     def test_new_reservations_require_valid_rut_at_form_and_service_levels(self):
         self.assertTrue(ContinuousReservationForm().fields['patient_rut'].required)
         self.assertTrue(ReservationRequestForm().fields['patient_rut'].required)
