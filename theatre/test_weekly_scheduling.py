@@ -11,7 +11,7 @@ from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Intervention, Reservation
+from .models import Intervention, OperatingSettings, Reservation
 from .scheduling import day_slots, reserve_hours
 from .services import create_intervention
 from .tests import fixtures
@@ -50,14 +50,15 @@ class WeeklySchedulingTests(TestCase):
         self.assertEqual(len(busy), 1)
         self.assertEqual(busy[0]['start'], booking.starts_at)
         self.assertEqual(busy[0]['end'], booking.ends_at)
-        self.assertEqual(day['free_minutes'], 1440 - 35)
+        self.assertEqual(day['free_minutes'], 16 * 60 - 35)
         self.assertEqual(sum((s['end'] - s['start']).total_seconds() for s in day['segments']), 24 * 3600)
 
     def test_initial_day_is_a_single_green_continuous_interval(self):
         day = continuous_day(self.room, self.day)
-        self.assertEqual(len(day['segments']), 1)
-        self.assertFalse(day['segments'][0]['busy'])
-        self.assertEqual(day['segments'][0]['height'], '100.000000')
+        self.assertEqual(len(day['segments']), 3)
+        self.assertEqual([s['closed'] for s in day['segments']], [True, False, True])
+        self.assertFalse(day['segments'][1]['busy'])
+        self.assertEqual(day['free_minutes'], 16 * 60)
 
     def test_overlap_in_preparation_alone_prevents_booking(self):
         slots = day_slots(self.day)
@@ -77,6 +78,10 @@ class WeeklySchedulingTests(TestCase):
         self.assertEqual(timezone.localtime(booking.starts_at).time(), time(9, 45))
 
     def test_preparation_checks_previous_day_and_is_shown_on_both_days(self):
+        policy = OperatingSettings.current()
+        policy.opening_time = time(0)
+        policy.closing_time = time(23, 59)
+        policy.save()
         booking = self.reserve(time(0), 30)
         self.assertEqual(timezone.localtime(booking.starts_at).date(), self.day - timedelta(days=1))
         before = continuous_day(self.room, self.day - timedelta(days=1))
@@ -84,10 +89,16 @@ class WeeklySchedulingTests(TestCase):
         self.assertEqual(sum(int((s['end'] - s['start']).total_seconds() // 60) for s in before['segments'] if s['busy']), 15)
         self.assertEqual(sum(int((s['end'] - s['start']).total_seconds() // 60) for s in selected['segments'] if s['busy']), 30)
         with self.assertRaises(ValidationError):
-            self.reserve(time(23, 30), 30, day=self.day - timedelta(days=1))
+            self.reserve(time(23, 30), 20, day=self.day - timedelta(days=1))
 
     def test_intervention_crossing_midnight_marks_next_day_and_blocks_hourly_agenda(self):
-        self.reserve(time(23, 30), 120)
+        with self.assertRaises(ValidationError):
+            self.reserve(time(23, 30), 120)
+        planned = timezone.make_aware(datetime.combine(self.day, time(23, 30)))
+        Reservation.objects.create(room=self.room, doctor=self.intervention.doctor,
+                                   procedure=self.intervention.procedure, patient_name='Paciente ficticio histórico',
+                                   starts_at=planned - timedelta(minutes=15), planned_start_at=planned,
+                                   ends_at=planned + timedelta(minutes=120), created_by=self.user)
         next_day = self.day + timedelta(days=1)
         following = continuous_day(self.room, next_day)
         busy_minutes = sum((s['end'] - s['start']).total_seconds() // 60 for s in following['segments'] if s['busy'])
@@ -174,7 +185,7 @@ class WeeklySchedulingTests(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             Reservation.objects.create(room=self.room, doctor=self.intervention.doctor,
                                        procedure=self.intervention.procedure, patient_name='Paciente ficticio', patient_rut='12345678-5',
-                                       starts_at=planned - timedelta(minutes=10), planned_start_at=planned,
+                                       starts_at=planned, planned_start_at=planned,
                                        ends_at=planned + timedelta(minutes=20), created_by=self.user)
 
     def test_authentication_permissions_and_disabled_room(self):

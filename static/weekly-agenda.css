@@ -8,6 +8,7 @@ header nav { justify-content: flex-end; }
 .continuous-legend { display: flex; gap: 24px; flex-wrap: wrap; margin: 20px 0; font-size: 13px; color: var(--muted); }
 .continuous-legend span { display: inline-flex; align-items: center; gap: 8px; }
 .continuous-legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.closed-dot { background: #dceff8; border: 1px solid #9bbfd0; }
 .free-dot { background: #a7dbb6; border: 1px solid #2e8a48; }
 .occupied-dot { background: #b91c1c; }
 .preparation-dot { background: #171717; }
@@ -24,6 +25,7 @@ header nav { justify-content: flex-end; }
 .continuous-timeline { height: 640px; position: relative; margin: 12px 0 22px; border: 1px solid #b8d6c0; border-radius: 6px; background: #d9f2df; }
 .timeline-spans { position: absolute; inset: 0; overflow: hidden; border-radius: 5px; }
 .continuous-span { display: block; position: absolute; left: 0; right: 0; }
+.continuous-span.closed { background: #dceff8; }
 .continuous-span.free { background: #d9f2df; }
 .continuous-span.occupied { background: #b91c1c; }
 .continuous-timeline.inactive .continuous-span { background: #795037; }

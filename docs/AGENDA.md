@@ -1,6 +1,6 @@
 # Disponibilidad y reservas por fecha
 
-Acceso desde **Agenda y reservas** o `/agenda/`. Requiere autenticación y permiso para operar intervenciones. La fecha se consulta mediante calendario y se muestran todos los pabellones y sus horas; se asume atención las 24 horas porque no hay un horario institucional configurado.
+Acceso desde **Agenda y reservas** o `/agenda/`. Requiere autenticación y permiso para operar intervenciones. La fecha se consulta mediante calendario y se muestran todos los pabellones y sus horas; se muestran las 24 horas y solo se admiten nuevas reservas dentro del horario configurado (07:00–23:00 por defecto).
 
 ## Tarjetas de una hora
 

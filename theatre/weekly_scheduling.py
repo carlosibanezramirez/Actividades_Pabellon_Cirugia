@@ -5,13 +5,13 @@ from django.db import transaction
 from django.forms import DateTimeField
 from django.utils import timezone
 
-from .models import Doctor, Procedure, Reservation, Room
+from .models import Doctor, OperatingSettings, Procedure, Reservation, Room
+from .operating import booking_window, validate_booking_window
 from .scheduling import day_slots, occupancy
 from .services import require_permission
 from .rut import normalize_rut
 
 
-PREPARATION = timedelta(minutes=15)
 WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 MAX_START_GAP = timedelta(minutes=30)
 
@@ -29,12 +29,15 @@ def validate_start_gap(room, day, planned):
         ended = timezone.localtime(previous.ends_at).strftime('%H:%M')
         raise ValidationError(
             f'El procedimiento anterior termina a las {ended}. El inicio solicitado no puede '
-            'quedar más de 30 minutos después, y los 15 minutos previos deben estar disponibles.'
+            'quedar más de 30 minutos después, y la preparación previa debe estar disponible.'
         )
 
 
-def available_starts(room, day, now=None, periods=None):
+def available_starts(room, day, now=None, periods=None, policy=None):
     now = now or timezone.now()
+    policy = policy or OperatingSettings.current()
+    preparation = timedelta(minutes=policy.preparation_mean_minutes)
+    opening, closing = booking_window(day, policy)
     if not room.active:
         return []
     if periods is None:
@@ -53,7 +56,9 @@ def available_starts(room, day, now=None, periods=None):
                 planned = DateTimeField().clean(datetime.combine(day, clock)).astimezone(datetime_timezone.utc)
             except ValidationError:
                 continue
-            start, end = planned - PREPARATION, planned + timedelta(minutes=1)
+            start, end = planned - preparation, planned + timedelta(minutes=1)
+            if planned < opening or end > closing:
+                continue
             if start < now or any(p['start'] < end and p['end'] > start for p in all_periods):
                 continue
             preceding = [booking for booking in bookings.values() if day_start < booking.ends_at <= planned]
@@ -65,8 +70,10 @@ def available_starts(room, day, now=None, periods=None):
     return options
 
 
-def continuous_day(room, day, now=None):
+def continuous_day(room, day, now=None, policy=None):
     now = now or timezone.now()
+    policy = policy or OperatingSettings.current()
+    opening, closing = booking_window(day, policy)
     slots, periods = occupancy(day, now, room.pk, minimum_use=timedelta(0))
     start, end = slots[0]['start'], slots[-1]['end']
     total = (end - start).total_seconds()
@@ -90,11 +97,25 @@ def continuous_day(room, day, now=None):
         cursor = right
     if cursor < end:
         segments.append({'start': cursor, 'end': end, 'busy': False})
+    split_segments = []
+    for segment in segments:
+        if segment['busy']:
+            split_segments.append({**segment, 'closed': False})
+            continue
+        limits = sorted({segment['start'], segment['end']} | {
+            boundary for boundary in [opening, closing] if segment['start'] < boundary < segment['end']
+        })
+        for left, right in zip(limits, limits[1:]):
+            split_segments.append({'start': left, 'end': right, 'busy': False,
+                                   'closed': right <= opening or left >= closing})
+    segments = split_segments
     for segment in segments:
         # CSS decimal con punto, independiente del formato numérico regional.
         segment['top'] = f'{100 * (segment["start"] - start).total_seconds() / total:.6f}'
         segment['height'] = f'{100 * (segment["end"] - segment["start"]).total_seconds() / total:.6f}'
         segment['label'] = 'Reservado / ocupado' if segment['busy'] else 'Libre'
+        if segment['closed']:
+            segment['label'] = 'Fuera de horario de reservas'
         if not room.active:
             segment['label'] = 'Pabellón no disponible'
     ticks = [{'position': '0', 'label': timezone.localtime(start).strftime('%H:%M')}]
@@ -105,11 +126,12 @@ def continuous_day(room, day, now=None):
     ticks.append({'position': '100', 'label': '24:00'})
     bookings = {p['reservation'].pk: p['reservation'] for p in periods if p['reservation']}
     blocks = []
-    options = available_starts(room, day, now, periods)
+    options = available_starts(room, day, now, periods, policy)
     for segment in segments:
-        if not segment['busy']:
+        if not segment['busy'] and not segment['closed']:
             candidates = [option for option in options
-                          if segment['start'] <= option['preparation_start']
+                          if (segment['start'] <= option['preparation_start'] or
+                              (segment['start'] == opening and option['planned'] >= opening))
                           and option['planned'] + timedelta(minutes=1) <= segment['end']]
             chained = [option for option in candidates if option['previous']]
             segment['suggested_time'] = chained[0]['value'] if chained else ''
@@ -144,10 +166,11 @@ def continuous_day(room, day, now=None):
     return {
         'date': day, 'weekday': WEEKDAYS[day.weekday()], 'segments': segments,
         'ticks': ticks, 'hours': int(total // 3600), 'active': room.active,
-        'free_minutes': int(sum((s['end'] - s['start']).total_seconds() for s in segments if not s['busy']) // 60),
+        'free_minutes': int(sum((s['end'] - s['start']).total_seconds() for s in segments if not s['busy'] and not s['closed']) // 60),
         'bookings': sorted(bookings.values(), key=lambda booking: (booking.starts_at, booking.pk)),
         'booking_blocks': blocks,
         'start_options': options,
+        'policy': policy,
     }
 
 
@@ -163,10 +186,12 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
         raise ValidationError('La duración debe ser un número entero entre 1 y 1440 minutos.')
     # Django rechaza horas ambiguas o inexistentes durante cambios de horario.
     planned = DateTimeField().clean(datetime.combine(day, desired_time)).astimezone(datetime_timezone.utc)
-    start, end = planned - PREPARATION, planned + timedelta(minutes=duration_minutes)
+    policy = OperatingSettings.current()
+    start, end = planned - timedelta(minutes=policy.preparation_mean_minutes), planned + timedelta(minutes=duration_minutes)
+    validate_booking_window(day, planned, end, policy)
     now = timezone.now()
     if start < now:
-        raise ValidationError('El inicio de preparación (15 minutos antes) no puede estar en el pasado.')
+        raise ValidationError(f'El inicio de preparación ({policy.preparation_mean_minutes} minutos antes) no puede estar en el pasado.')
     patient_name = patient_name.strip()
     if not patient_name or len(patient_name) > 180:
         raise ValidationError('Ingrese el nombre del paciente (máximo 180 caracteres).')
@@ -180,7 +205,7 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
     while cursor <= last_day:
         _, periods = occupancy(cursor, now, locked_room.pk, minimum_use=timedelta(0))
         if any(period['start'] < end and period['end'] > start for period in periods):
-            raise ValidationError('No hay espacio para el intervalo completo, incluidos los 15 minutos previos de preparación. Elija otro horario.')
+            raise ValidationError(f'No hay espacio para el intervalo completo, incluidos los {policy.preparation_mean_minutes} minutos previos de preparación. Elija otro horario.')
         cursor += timedelta(days=1)
     validate_start_gap(locked_room, day, planned)
     return Reservation.objects.create(

@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -12,10 +12,18 @@ from django.utils import timezone
 from urllib.parse import urlencode
 from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm
 from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
-from .models import Event, Intervention, Reservation, Room
+from .models import Event, Intervention, OperatingSettings, Reservation, Room
 from .weekly_scheduling import continuous_day, reserve_continuous, week_start
 from .scheduling import availability, reserve_hours
 from .services import correct_event, create_intervention, record_event
+from .alarms import active_preparations, preparation_alarm
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def preparation_status(request):
+    return JsonResponse(active_preparations())
 
 
 @login_required
@@ -32,9 +40,11 @@ def weekly_agenda(request):
     if form.is_valid():
         room = form.cleaned_data['room']
         monday = week_start(form.cleaned_data['fecha'])
+        policy = OperatingSettings.current()
         context.update({
             'room': room, 'monday': monday, 'sunday': monday + timedelta(days=6),
-            'days': [continuous_day(room, monday + timedelta(days=i)) for i in range(7)],
+            'days': [continuous_day(room, monday + timedelta(days=i), policy=policy) for i in range(7)],
+            'policy': policy,
             'previous_query': urlencode({'room': room.pk, 'fecha': (monday - timedelta(days=7)).isoformat()}),
             'next_query': urlencode({'room': room.pk, 'fecha': (monday + timedelta(days=7)).isoformat()}),
         })
@@ -66,7 +76,7 @@ def weekly_day(request, room_id, day_string):
         else:
             start = timezone.localtime(booking.starts_at).strftime('%d/%m %H:%M')
             end = timezone.localtime(booking.ends_at).strftime('%d/%m %H:%M')
-            messages.success(request, f'Reserva #{booking.pk} confirmada: {start}–{end}, incluidos los 15 minutos de preparación.')
+            messages.success(request, f'Reserva #{booking.pk} confirmada: {start}–{end}, incluidos los {booking.preparation_minutes} minutos de preparación.')
             return redirect('weekly_day', room_id=room.pk, day_string=day.isoformat())
     return render(request, 'theatre/weekly_day.html', {
         'room': room, 'day': day_data, 'form': form,
@@ -204,7 +214,12 @@ def detail(request, pk):
         if event:
             previous = event
     total = str(events[-1].occurred_at - events[0].occurred_at).split('.')[0] if len(events) == 9 else None
-    return render(request, 'theatre/detail.html', {'intervention': intervention, 'rows': rows, 'count': len(events), 'total': total})
+    policy = OperatingSettings.current()
+    alarm = preparation_alarm(intervention.room_id, intervention.pk,
+                              events[0].occurred_at if events else None,
+                              events[-1].stage if events and not intervention.completed_at else None,
+                              policy.preparation_max_minutes, timezone.now())
+    return render(request, 'theatre/detail.html', {'intervention': intervention, 'rows': rows, 'count': len(events), 'total': total, 'alarm': alarm})
 
 
 @login_required

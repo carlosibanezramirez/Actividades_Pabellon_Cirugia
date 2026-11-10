@@ -5,7 +5,8 @@ from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.utils import timezone
 
-from .models import Doctor, Event, Intervention, Procedure, Reservation, Room
+from .models import Doctor, Event, Intervention, OperatingSettings, Procedure, Reservation, Room
+from .operating import booking_window, validate_booking_window
 from .services import require_permission
 from .rut import normalize_rut
 
@@ -82,6 +83,8 @@ def occupancy(day, now=None, room_id=None, minimum_use=HOUR):
 
 def availability(day, now=None):
     now = now or timezone.now()
+    policy = OperatingSettings.current()
+    opening, closing = booking_window(day, policy)
     slots, periods = occupancy(day, now)
     priority = {'no_disponible': 1, 'preparacion': 2, 'procedimiento': 3}
     by_room = {}
@@ -99,10 +102,13 @@ def availability(day, now=None):
             busy = max(matches, key=lambda p: priority[p['state']]) if matches else None
             state = 'no_disponible' if not room.active else (busy['state'] if busy else 'libre')
             label = 'No disponible' if not room.active else (busy['label'] if busy else 'Libre')
+            outside_hours = slot['start'] < opening or slot['end'] > closing
+            if room.active and not busy and outside_hours:
+                state, label = 'fuera_horario', 'Fuera de horario'
             cells.append({**slot, 'value': f'{room.pk}:{slot["index"]}',
                           'time_label': slot['label'],
                           'state': state, 'label': label,
-                          'selectable': room.active and not matches and slot['start'] >= now,
+                          'selectable': room.active and not matches and not outside_hours and slot['start'] >= now,
                           'past': slot['start'] < now,
                           'busy': busy})
         rows.append({'room': room, 'slots': cells})
@@ -113,6 +119,8 @@ def availability(day, now=None):
 @transaction.atomic
 def reserve_hours(*, user, day, selections, doctor, procedure, patient_name, patient_rut=''):
     require_permission(user, 'theatre.operate_intervention')
+    # Mismo orden de acceso que las reservas continuas: configuración antes del pabellón.
+    policy = OperatingSettings.current()
     patient_rut = normalize_rut(patient_rut)
     patient_name = patient_name.strip()
     if not patient_name or len(patient_name) > 180:
@@ -133,6 +141,7 @@ def reserve_hours(*, user, day, selections, doctor, procedure, patient_name, pat
     if indexes[0] < 0 or indexes[-1] >= len(slots) or indexes != list(range(indexes[0], indexes[-1] + 1)):
         raise ValidationError('Las horas deben ser consecutivas y pertenecer a la fecha seleccionada.')
     start, end = slots[indexes[0]]['start'], slots[indexes[-1]]['end']
+    validate_booking_window(day, start, end, policy)
     now = timezone.now()
     if start < now:
         raise ValidationError('No se pueden reservar bloques que ya comenzaron.')
