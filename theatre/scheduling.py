@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from .models import Doctor, Event, Intervention, Procedure, Reservation, Room
 from .services import require_permission
+from .rut import normalize_rut
 
 
 HOUR = timedelta(hours=1)
@@ -110,8 +111,9 @@ def availability(day, now=None):
 
 
 @transaction.atomic
-def reserve_hours(*, user, day, selections, doctor, procedure, patient_name):
+def reserve_hours(*, user, day, selections, doctor, procedure, patient_name, patient_rut=''):
     require_permission(user, 'theatre.operate_intervention')
+    patient_rut = normalize_rut(patient_rut)
     patient_name = patient_name.strip()
     if not patient_name or len(patient_name) > 180:
         raise ValidationError('Ingrese el nombre del paciente (máximo 180 caracteres).')
@@ -140,4 +142,5 @@ def reserve_hours(*, user, day, selections, doctor, procedure, patient_name):
     if any(period['start'] < end and period['end'] > start for period in periods):
         raise ValidationError('Una o más horas ya no están disponibles. Actualice la agenda y seleccione otras.')
     return Reservation.objects.create(room=room, doctor=doctor, procedure=procedure,
-                                      patient_name=patient_name, starts_at=start, ends_at=end, created_by=user)
+                                      patient_name=patient_name, patient_rut=patient_rut,
+                                      starts_at=start, ends_at=end, created_by=user)

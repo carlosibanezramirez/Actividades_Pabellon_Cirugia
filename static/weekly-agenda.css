@@ -10,12 +10,14 @@ header nav { justify-content: flex-end; }
 .continuous-legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
 .free-dot { background: #a7dbb6; border: 1px solid #2e8a48; }
 .occupied-dot { background: #b91c1c; }
+.preparation-dot { background: #171717; }
 .inactive-dot { background: #795037; }
 .week-scroll { overflow-x: auto; padding: 4px 4px 20px; }
 .week-grid { display: grid; grid-template-columns: repeat(7,minmax(125px,1fr)); gap: 12px; min-width: 960px; }
 .week-day { display: block; text-decoration: none; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 12px; padding: 16px 10px; }
 .week-day:hover { outline: 2px solid var(--primary); outline-offset: 1px; }
 .week-day-heading { min-height: 85px; display: flex; flex-direction: column; gap: 4px; text-align: center; }
+.week-day-heading { text-decoration: none; color: inherit; }
 .week-day-heading strong { font-size: 14px; }
 .week-day-heading span { font-size: 21px; font-weight: 750; }
 .week-day-heading small { font-size: 10px; color: var(--muted); }
@@ -26,6 +28,18 @@ header nav { justify-content: flex-end; }
 .continuous-span.occupied { background: #b91c1c; }
 .continuous-timeline.inactive .continuous-span { background: #795037; }
 .time-ruler { position: absolute; inset: 0; pointer-events: none; }
+.time-ruler { z-index: 2; }
+.timeline-day-link { position: absolute; inset: 0; z-index: 1; }
+.reservation-block { position: absolute; z-index: 3; left: 0; right: 0; width: 100%; display: flex; flex-direction: column; justify-content: flex-start; text-align: left; gap: 1px; padding: 3px 4px; border: 1px solid #ffffffb0; border-radius: 2px; background: #b91c1c; color: white; overflow: hidden; font-size: 9px; line-height: 1.15; font-weight: 400; cursor: help; }
+.reservation-block>span { display: block; width: 100%; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reservation-block-title { font-weight: 750; }
+.reservation-block-hours { font-variant-numeric: tabular-nums; }
+.daily-timeline .reservation-block { font-size: 10px; }
+.reservation-block.compact,.daily-timeline .reservation-block.compact { font-size: 8px; line-height: 1; gap: 0; padding: 0 2px; }
+.reservation-block.preparation-block { background: #171717; border: 0; padding: 0 2px; }
+.reservation-tooltip { position: fixed; z-index: 10000; width: max-content; max-width: min(340px,calc(100vw - 20px)); background: #17313b; color: white; border-radius: 9px; padding: 14px 16px; box-shadow: 0 6px 24px #0004; font: 13px/1.45 system-ui,sans-serif; pointer-events: none; overflow-wrap: anywhere; }
+.reservation-tooltip[hidden] { display: none; }
+.reservation-tooltip p { margin: 5px 0; }
 .time-ruler>span { position: absolute; left: 5px; transform: translateY(-50%); border-top: 1px solid #657c6a40; font-size: 10px; color: #173e26; font-variant-numeric: tabular-nums; background: #ffffffde; padding: 1px 3px; border-radius: 3px; }
 .open-day { display: block; text-align: center; font-size: 11px; font-weight: 700; color: var(--primary); }
 .daily-layout { display: grid; grid-template-columns: minmax(240px,.7fr) minmax(0,1.5fr); gap: 26px; align-items: start; }
@@ -38,4 +52,4 @@ header nav { justify-content: flex-end; }
 .day-bookings h3 { font-size: 16px; }
 .continuous-booking .helptext { font-size: 12px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-@media(max-width:740px) { header nav { justify-content: flex-start; } .daily-layout { grid-template-columns: 1fr; } .daily-timeline .continuous-timeline { height: 340px; } .weekly-filter button { margin-top: 0; } }
+@media(max-width:740px) { header nav { justify-content: flex-start; } .daily-layout { grid-template-columns: 1fr; } .daily-timeline .continuous-timeline { height: 670px; } .weekly-filter button { margin-top: 0; } }

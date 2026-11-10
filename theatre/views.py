@@ -90,7 +90,7 @@ def agenda(request):
         try:
             booking = reserve_hours(user=request.user, day=day, selections=form.cleaned_data['slots'],
                                     doctor=form.cleaned_data['doctor'], procedure=form.cleaned_data['procedure'],
-                                    patient_name=form.cleaned_data['patient_name'])
+                                    patient_name=form.cleaned_data['patient_name'], patient_rut=form.cleaned_data['patient_rut'])
         except ValidationError as exc:
             form.add_error(None, exc)
         else:

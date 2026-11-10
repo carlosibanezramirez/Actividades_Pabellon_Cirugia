@@ -28,7 +28,7 @@ class WeeklySchedulingTests(TestCase):
     def reserve(self, desired_time=time(9, 30), duration_minutes=90, **overrides):
         args = dict(user=self.user, room=self.room, day=self.day, desired_time=desired_time,
                     duration_minutes=duration_minutes, doctor=self.intervention.doctor,
-                    procedure=self.intervention.procedure, patient_name='Paciente ficticio semanal')
+                    procedure=self.intervention.procedure, patient_name='Paciente ficticio semanal', patient_rut='12345678-5')
         args.update(overrides)
         return reserve_continuous(**args)
 
@@ -64,7 +64,7 @@ class WeeklySchedulingTests(TestCase):
         index = next(s['index'] for s in slots if timezone.localtime(s['start']).time() == time(8))
         reserve_hours(user=self.user, day=self.day, selections=[f'{self.room.pk}:{index}'],
                       doctor=self.intervention.doctor, procedure=self.intervention.procedure,
-                      patient_name='Paciente ficticio anterior')
+                      patient_name='Paciente ficticio anterior', patient_rut='12345678-5')
         with self.assertRaises(ValidationError):
             self.reserve(time(9), 20)
         self.reserve(time(9, 30), 20)
@@ -95,7 +95,7 @@ class WeeklySchedulingTests(TestCase):
         with self.assertRaises(ValidationError):
             reserve_hours(user=self.user, day=next_day, selections=[f'{self.room.pk}:0'],
                           doctor=self.intervention.doctor, procedure=self.intervention.procedure,
-                          patient_name='Paciente ficticio horario')
+                          patient_name='Paciente ficticio horario', patient_rut='12345678-5')
 
     def test_only_half_hour_starts_positive_minutes_and_future_preparation_are_accepted(self):
         for clock in [time(9, 15), time(9, 30, 1)]:
@@ -135,7 +135,7 @@ class WeeklySchedulingTests(TestCase):
         url = reverse('weekly_day', args=[self.room.pk, self.day.isoformat()])
         response = self.client.post(url, {
             'doctor': self.intervention.doctor_id, 'procedure': self.intervention.procedure_id,
-            'patient_name': 'Paciente ficticio del formulario', 'desired_time': '09:30',
+            'patient_name': 'Paciente ficticio del formulario', 'patient_rut': '12345678-5', 'desired_time': '09:30',
             'duration_minutes': '90',
         }, follow=True)
         self.assertEqual(response.status_code, 200)
@@ -149,13 +149,13 @@ class WeeklySchedulingTests(TestCase):
     def test_invalid_patient_or_time_does_not_save_and_conflicts_are_reported(self):
         url = reverse('weekly_day', args=[self.room.pk, self.day.isoformat()])
         data = {'doctor': self.intervention.doctor_id, 'procedure': self.intervention.procedure_id,
-                'patient_name': '', 'desired_time': '09:15', 'duration_minutes': '20'}
+                'patient_name': '', 'patient_rut': '12345678-5', 'desired_time': '09:15', 'duration_minutes': '20'}
         response = self.client.post(url, data)
         self.assertIn('patient_name', response.context['form'].errors)
         self.assertIn('desired_time', response.context['form'].errors)
         self.assertEqual(Reservation.objects.count(), 0)
         self.reserve()
-        response = self.client.post(url, {**data, 'patient_name': 'Paciente ficticio', 'desired_time': '09:30'})
+        response = self.client.post(url, {**data, 'patient_name': 'Paciente ficticio', 'patient_rut': '12345678-5', 'desired_time': '09:30'})
         self.assertContains(response, 'No hay espacio para el intervalo completo')
         self.assertEqual(Reservation.objects.count(), 1)
 
@@ -173,7 +173,7 @@ class WeeklySchedulingTests(TestCase):
         planned = timezone.make_aware(datetime.combine(self.day, time(9)))
         with self.assertRaises(IntegrityError), transaction.atomic():
             Reservation.objects.create(room=self.room, doctor=self.intervention.doctor,
-                                       procedure=self.intervention.procedure, patient_name='Paciente ficticio',
+                                       procedure=self.intervention.procedure, patient_name='Paciente ficticio', patient_rut='12345678-5',
                                        starts_at=planned - timedelta(minutes=10), planned_start_at=planned,
                                        ends_at=planned + timedelta(minutes=20), created_by=self.user)
 
@@ -208,12 +208,12 @@ class WeeklyConcurrencyTests(TransactionTestCase):
                 if mode == 'continuous':
                     reserve_continuous(user=actor, room=intervention.room, day=day, desired_time=time(9),
                                        duration_minutes=20, doctor=intervention.doctor, procedure=intervention.procedure,
-                                       patient_name='Paciente ficticio continuo')
+                                       patient_name='Paciente ficticio continuo', patient_rut='12345678-5')
                 else:
                     slot = next(slot for slot in day_slots(day) if timezone.localtime(slot['start']).time() == time(8))
                     reserve_hours(user=actor, day=day, selections=[f'{item.room_id}:{slot["index"]}'],
                                   doctor=intervention.doctor, procedure=intervention.procedure,
-                                  patient_name='Paciente ficticio horario')
+                                  patient_name='Paciente ficticio horario', patient_rut='12345678-5')
                 return 'ok'
             except ValidationError:
                 return 'rejected'

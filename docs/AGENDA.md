@@ -20,7 +20,7 @@ Sin salida registrada, una intervención bloquea el resto del día actual y los 
 1. Elegir fecha y consultar.
 2. Marcar una o más tarjetas verdes consecutivas del mismo pabellón. Al elegir otro pabellón, la selección anterior se limpia.
 3. Seleccionar médico solicitante y tipo de cirugía de las listas activas.
-4. Escribir el nombre del paciente y confirmar.
+4. Escribir el nombre y RUT del paciente (con dígito verificador válido) y confirmar.
 
 Se registra pabellón, fecha y horas exactas, médico, cirugía, paciente, usuario y momento de creación. Una reserva dura como mínimo una hora y solo puede usar bloques completos que no hayan comenzado. Puede terminar a medianoche del día siguiente si se selecciona la última hora del día.
 
