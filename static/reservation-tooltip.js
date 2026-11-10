@@ -30,7 +30,7 @@
     const rows = [['Etapa', block.dataset.phase],
       ['Tipo de cirugía', block.dataset.surgery], ['Médico', block.dataset.doctor],
       ['Horario Tramo', block.dataset.phaseHours], ['Horario Reserva', block.dataset.hours],
-      ['Duración de la Reserva en minutos', block.dataset.duration],
+      ['Duración Reserva', `${block.dataset.duration} minutos`],
       ['Paciente', block.dataset.patient], ['RUT', block.dataset.rut]];
     rows.forEach(([label, value]) => {
       const row = document.createElement('p');
