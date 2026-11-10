@@ -21,6 +21,14 @@ Por ejemplo: inicio solicitado `09:30`, duración `90` minutos. El pabellón que
 
 El comienzo de los 15 minutos previos no puede estar en el pasado. Se rechaza cualquier intersección con una reserva o uso ya registrado del mismo pabellón, aunque el conflicto solo afecte la preparación. Intervalos contiguos que se tocan exactamente sin superponerse sí se permiten.
 
+Al pulsar un tramo verde posterior a una reserva, se ofrece el primer inicio compatible a la hora o media hora, dejando disponibles los 15 minutos previos de preparación. Por ejemplo, después de un término a las 11:00 se sugiere inicio a las 11:30, con preparación desde las 11:15. La sugerencia se precarga en el formulario del día.
+
+Para las nuevas solicitudes posteriores a otra reserva del mismo pabellón en ese día, el inicio solicitado por el médico no puede quedar más de 30 minutos después del término anterior. La primera reserva del día elige su horario libremente; no se arrastra la última reserva de días anteriores. Una reserva que termina después de medianoche sí cuenta como anterior en el día en que termina. Los horarios ya registrados no se modifican retrospectivamente.
+
+El selector muestra únicamente inicios que cumplen la continuidad, la preparación completa y al menos un minuto disponible para intervención; al confirmar se comprueba la duración completa solicitada. La validación se repite bajo bloqueo del pabellón y también se aplica al inicio de nuevas reservas de la agenda horaria anterior.
+
+Si el término anterior fue a las 11:20, un inicio a las 11:30 no permite los 15 minutos de preparación y uno a las 12:00 supera los 30 minutos máximos. En ese caso no se ofrece una hora incompatible ni se acorta la preparación: se indica que ese tramo no admite inicio y debe seleccionarse otro. Los enlaces de sugerencia que dejaron de estar disponibles muestran un aviso y se vuelve a consultar la disponibilidad.
+
 La preparación puede comenzar el día anterior y la intervención puede terminar el siguiente; se comprueban y colorean todos los días afectados. Tras guardar se vuelve al día seleccionado con la preparación en negro y la intervención en rojo, un mensaje con el horario completo y la reserva en el listado.
 
 Los horarios se guardan en UTC y se muestran en America/Santiago. En cambios de hora se usan duraciones reales; se rechazan horas de inicio inexistentes o ambiguas. La escala continua contempla días de 23 o 25 horas.

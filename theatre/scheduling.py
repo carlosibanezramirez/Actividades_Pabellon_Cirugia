@@ -141,6 +141,8 @@ def reserve_hours(*, user, day, selections, doctor, procedure, patient_name, pat
     _, periods = occupancy(day, now, room.pk)
     if any(period['start'] < end and period['end'] > start for period in periods):
         raise ValidationError('Una o más horas ya no están disponibles. Actualice la agenda y seleccione otras.')
+    from .weekly_scheduling import validate_start_gap
+    validate_start_gap(room, day, start)
     return Reservation.objects.create(room=room, doctor=doctor, procedure=procedure,
                                       patient_name=patient_name, patient_rut=patient_rut,
                                       starts_at=start, ends_at=end, created_by=user)

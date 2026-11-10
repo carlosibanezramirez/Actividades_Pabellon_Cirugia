@@ -29,7 +29,7 @@ header nav { justify-content: flex-end; }
 .continuous-timeline.inactive .continuous-span { background: #795037; }
 .time-ruler { position: absolute; inset: 0; pointer-events: none; }
 .time-ruler { z-index: 2; }
-.timeline-day-link { position: absolute; inset: 0; z-index: 1; }
+.timeline-day-link { position: absolute; left: 0; right: 0; z-index: 1; }
 .reservation-block { position: absolute; z-index: 3; left: 0; right: 0; width: 100%; display: flex; flex-direction: column; justify-content: flex-start; text-align: left; gap: 1px; padding: 3px 4px; border: 1px solid #ffffffb0; border-radius: 2px; background: #b91c1c; color: white; overflow: hidden; font-size: 9px; line-height: 1.15; font-weight: 400; cursor: help; }
 .reservation-block>span { display: block; width: 100%; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reservation-block-title { font-weight: 750; }

@@ -120,6 +120,14 @@ class WeeklyAgendaForm(AgendaDateForm):
 
 
 class ContinuousReservationForm(forms.Form):
+    def __init__(self, *args, allowed_times=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.allowed_times = allowed_times
+        if allowed_times is not None:
+            self.fields['desired_time'].widget.choices = [('', 'Seleccione hora de inicio')] + [
+                (value, value) for value in allowed_times
+            ]
+
     doctor = forms.ModelChoiceField(label='Médico solicitante', queryset=Doctor.objects.filter(active=True))
     patient_name = forms.CharField(label='Nombre del paciente', max_length=180)
     patient_rut = RutField()
@@ -140,4 +148,6 @@ class ContinuousReservationForm(forms.Form):
         value = self.cleaned_data['desired_time']
         if value.minute not in (0, 30) or value.second or value.microsecond:
             raise forms.ValidationError('Seleccione un inicio a la hora o media hora.')
+        if self.allowed_times is not None and value.strftime('%H:%M') not in self.allowed_times:
+            raise forms.ValidationError('Seleccione un horario disponible que respete el máximo de 30 minutos desde el procedimiento anterior.')
         return value
