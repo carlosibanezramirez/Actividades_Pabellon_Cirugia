@@ -1,11 +1,15 @@
-.occupancy-rooms { display: flex; flex-direction: column; gap: 28px; }
-.occupancy-room { min-width: 0; }
-.occupancy-room h2 { margin: 0 0 16px; }
-.occupancy-day { border-top: 5px solid #b91c1c; margin-bottom: 14px; }
+.occupancy-matrix-scroll { overflow-x: auto; padding-bottom: 16px; }
+.occupancy-matrix { width: 100%; min-width: 1960px; table-layout: fixed; border-collapse: separate; border-spacing: 12px; }
+.occupancy-matrix th { text-align: center; text-transform: capitalize; padding: 12px 8px; background: #e4eef0; border-radius: 8px; }
+.occupancy-matrix th span { display: block; font-size: 14px; font-weight: 400; margin-top: 6px; }
+.occupancy-matrix td { padding: 0; vertical-align: top; border: 0; }
+.occupancy-day { border-top: 5px solid #b91c1c; margin: 0; padding: 18px; }
+.occupancy-date { color: var(--muted); font-size: 13px; }
 .occupancy-day.available { border-top-color: #2e8a48; }
 .occupancy-day.unavailable { border-top-color: #795037; }
 .occupancy-day-heading, .occupancy-day-footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
-.occupancy-day-heading h3 { margin: 0; text-transform: capitalize; }
+.occupancy-day-heading { align-items: flex-start; flex-direction: column; }
+.occupancy-day-heading h3 { margin: 0; }
 .reservation-count { background: #eef2f6; padding: 6px 12px; border-radius: 20px; font-size: 14px; }
 .free-intervals { list-style: none; padding: 0; margin: 18px 0; }
 .free-intervals li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 12px 16px; background: #edf8f0; border-left: 3px solid #2e8a48; border-radius: 5px; margin-bottom: 8px; }
