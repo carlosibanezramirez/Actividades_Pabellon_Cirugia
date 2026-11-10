@@ -49,6 +49,20 @@ class WeeklyOccupancySummaryTests(TestCase):
         self.assertContains(response, '3 reservas activas')
         self.assertNotContains(response, 'Paciente ficticio resumen')
 
+    def test_gaps_below_75_minutes_are_hidden_and_excluded_from_total(self):
+        self.booking(time(7), time(12))
+        self.booking(time(13, 14), time(15))
+        self.booking(time(16, 15), time(23))
+        day = weekly_occupancy_summary(self.monday)[0]['days'][0]
+        self.assertEqual(day['active_count'], 3)
+        self.assertEqual([gap['minutes'] for gap in day['intervals']], [75])
+        self.assertEqual(day['free_minutes'], 75)
+        response = self.client.get(reverse('weekly_summary'), {'fecha': self.monday.isoformat()})
+        self.assertNotContains(response, '12:00 – 13:14')
+        self.assertContains(response, '15:00 – 16:15')
+        self.assertContains(response, '75 minutos disponibles')
+        self.assertContains(response, '<th scope="col">', count=7)
+
     def test_room_hours_inactive_rooms_and_empty_days(self):
         other = Room.objects.create(name='Otro pabellón', opening_time=time(9), closing_time=time(18))
         closed = Room.objects.create(name='Pabellón inactivo', active=False)

@@ -9,6 +9,9 @@ from .scheduling import occupancy
 from .weekly_scheduling import week_start
 
 
+MINIMUM_FREE_INTERVAL = timedelta(minutes=75)
+
+
 def weekly_occupancy_summary(day, now=None):
     now = now or timezone.now()
     monday = week_start(day)
@@ -40,6 +43,8 @@ def weekly_occupancy_summary(day, now=None):
                     cursor = max(cursor, end)
                 if cursor < closing:
                     free.append({'start': cursor, 'end': closing})
+            free = [interval for interval in free
+                    if interval['end'] - interval['start'] >= MINIMUM_FREE_INTERVAL]
             for interval in free:
                 interval['minutes'] = int((interval['end'] - interval['start']).total_seconds() // 60)
             row['days'].append({
