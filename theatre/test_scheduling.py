@@ -134,9 +134,12 @@ class SchedulingTests(TestCase):
 
     def test_last_hour_can_end_next_day_and_short_use_blocks_across_midnight(self):
         last = day_slots(self.day)[-1]
-        booking = self.reserve(last['index'])
+        with self.assertRaises(ValidationError):
+            self.reserve(last['index'])
+        closing_slot = next(s for s in day_slots(self.day) if timezone.localtime(s['end']).time().hour == 23)
+        booking = self.reserve(closing_slot['index'])
         self.assertEqual(booking.ends_at - booking.starts_at, HOUR)
-        self.assertEqual(timezone.localtime(booking.ends_at).date(), self.day + timedelta(days=1))
+        self.assertEqual(timezone.localtime(booking.ends_at).date(), self.day)
         old_day = timezone.localdate() - timedelta(days=2)
         start = day_slots(old_day)[-1]['start'] + timedelta(minutes=45)
         end = start + timedelta(minutes=10)
@@ -146,7 +149,7 @@ class SchedulingTests(TestCase):
                                  original_at=at, recorded_by=self.user)
         cells = availability(old_day + timedelta(days=1))['rows'][0]['slots']
         self.assertEqual(cells[0]['state'], 'procedimiento')
-        self.assertEqual(cells[1]['state'], 'libre')
+        self.assertEqual(cells[1]['state'], 'fuera_horario')
 
     def test_open_intervention_prevents_booking_later_today(self):
         day = timezone.localdate()

@@ -16,6 +16,8 @@ La [agenda de reservas](docs/AGENDA.md), en `/agenda/`, permite consultar una fe
 
 La [agenda semanal continua](docs/AGENDA_SEMANAL.md), en `/agenda-semanal/`, muestra un único pabellón de lunes a domingo. Al elegir un día permite reservar por minutos, con inicio a la hora o media hora y 15 minutos previos de preparación del pabellón.
 
+En [Configuración de pabellones](docs/CONFIGURACION.md), Administración define los tiempos medio y máximo de preparación y el horario de reservas (07:00–23:00 por defecto). El tiempo medio reemplaza los 15 minutos iniciales en nuevas reservas; el máximo activa una alarma visual en preparaciones en curso.
+
 Consultar [la guía de instalación](docs/INSTALACION.md) para configurar la VM, HTTPS, usuarios y respaldos. La configuración real se mantiene fuera de GitHub.
 
 Con Python 3.12, un entorno virtual y PostgreSQL disponibles:

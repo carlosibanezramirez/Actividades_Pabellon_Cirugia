@@ -4,7 +4,8 @@ from urllib.parse import urlencode
 from django.db.models import Case, DateTimeField, IntegerField, Max, OuterRef, Subquery, Value, When
 from django.utils import timezone
 
-from .models import Event, Intervention, Room
+from .models import Event, Intervention, OperatingSettings, Room
+from .alarms import preparation_alarm
 
 
 STATES = (
@@ -53,10 +54,13 @@ def current_room_state(room, intervention, stage):
 
 
 def room_snapshot():
+    policy = OperatingSettings.current()
+    now = timezone.now()
+    prep_start = Event.objects.filter(intervention_id=OuterRef('pk'), stage=Event.Stage.ROOM_START).values('occurred_at')[:1]
     opened = {
         item.room_id: item for item in Intervention.objects.filter(completed_at__isnull=True)
         .select_related('procedure', 'doctor', 'anesthetist')
-        .annotate(last_stage=Max('events__stage'))
+        .annotate(last_stage=Max('events__stage'), preparation_started=Subquery(prep_start))
     }
     rows = []
     counts = dict.fromkeys(dict(STATES), 0)
@@ -69,12 +73,17 @@ def room_snapshot():
             'room': room, 'state': state, 'state_label': dict(STATES)[state],
             'intervention': intervention,
             'state_reason': reason,
+            'alarm': preparation_alarm(room.pk, intervention.pk if intervention else None,
+                                       intervention.preparation_started if intervention else None,
+                                       stage, policy.preparation_max_minutes, now),
             'last_event': Event.Stage(stage).label if stage else ('Sin eventos registrados' if intervention else '—'),
         })
     return rows, counts
 
 
 def room_board():
+    policy = OperatingSettings.current()
+    now = timezone.now()
     # Mostrar la intervención abierta o, si no existe, la última realizada.
     latest = Intervention.objects.filter(room_id=OuterRef('pk')).annotate(
         open_priority=Case(When(completed_at__isnull=True, then=Value(0)), default=Value(1)),
@@ -99,6 +108,10 @@ def room_board():
             'room': room, 'state': state, 'state_label': dict(STATES)[state],
             'state_reason': reason, 'intervention': item,
             'finished': bool(item and item.usage_ended_at),
+            'alarm': preparation_alarm(room.pk, item.pk if item else None,
+                                       item.usage_started_at if item else None,
+                                       stage if item and not item.completed_at else None,
+                                       policy.preparation_max_minutes, now),
         })
     return cards
 

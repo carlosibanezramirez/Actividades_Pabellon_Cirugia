@@ -100,7 +100,7 @@ class RoomBoardTests(TestCase):
         Intervention.objects.filter(pk=last.pk).update(created_at=self.intervention.created_at - timedelta(days=1))
         Event.objects.create(intervention=last, stage=1, occurred_at=start, original_at=start, recorded_by=self.user)
         Event.objects.create(intervention=last, stage=9, occurred_at=end, original_at=end - timedelta(minutes=2), recorded_by=self.user)
-        with self.assertNumQueries(2):
+        with self.assertNumQueries(3):
             cards = room_board()
         self.assertEqual(cards[0]['intervention'].pk, last.pk)
         self.assertEqual(cards[0]['intervention'].usage_ended_at, end)

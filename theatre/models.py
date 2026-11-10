@@ -1,5 +1,7 @@
-from datetime import timedelta
+from datetime import time, timedelta
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
 
@@ -14,6 +16,51 @@ class Catalog(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class OperatingSettings(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    preparation_mean_minutes = models.PositiveIntegerField(
+        'Tiempo medio de preparación (minutos)', default=15,
+        validators=[MinValueValidator(1), MaxValueValidator(1440)],
+        help_text='Se agrega antes del inicio solicitado en nuevas reservas. Las reservas existentes conservan sus horarios.',
+    )
+    preparation_max_minutes = models.PositiveIntegerField(
+        'Tiempo máximo de preparación (minutos)', default=30,
+        validators=[MinValueValidator(1), MaxValueValidator(1440)],
+        help_text='Se activa una alarma visual cuando la preparación real en curso supera este tiempo.',
+    )
+    opening_time = models.TimeField('Hora de apertura de reservas', default=time(7))
+    closing_time = models.TimeField('Hora de cierre de reservas', default=time(23))
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'configuración de pabellones'
+        verbose_name_plural = 'configuración de pabellones'
+        constraints = [
+            models.CheckConstraint(condition=Q(pk=1), name='single_operating_settings'),
+            models.CheckConstraint(condition=Q(preparation_mean_minutes__gte=1, preparation_mean_minutes__lte=1440), name='valid_preparation_mean'),
+            models.CheckConstraint(condition=Q(preparation_max_minutes__gte=models.F('preparation_mean_minutes'), preparation_max_minutes__lte=1440), name='valid_preparation_max'),
+            models.CheckConstraint(condition=Q(closing_time__gt=models.F('opening_time')), name='valid_booking_hours'),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.preparation_max_minutes is not None and self.preparation_mean_minutes is not None and self.preparation_max_minutes < self.preparation_mean_minutes:
+            raise ValidationError({'preparation_max_minutes': 'El máximo debe ser igual o mayor al tiempo medio.'})
+        if self.opening_time is not None and self.closing_time is not None and self.opening_time >= self.closing_time:
+            raise ValidationError({'closing_time': 'El cierre debe ser posterior a la apertura dentro del mismo día.'})
+        for field in ['opening_time', 'closing_time']:
+            value = getattr(self, field)
+            if value is not None and (value.second or value.microsecond):
+                raise ValidationError({field: 'Ingrese horas y minutos, sin segundos.'})
+
+    @classmethod
+    def current(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+    def __str__(self):
+        return 'Configuración general de pabellones'
 
 
 class Room(Catalog):
@@ -70,7 +117,7 @@ class Reservation(models.Model):
             condition=(
                 Q(planned_start_at__isnull=True, ends_at__gte=models.F('starts_at') + timedelta(hours=1))
                 | Q(planned_start_at__isnull=False,
-                    starts_at=models.F('planned_start_at') - timedelta(minutes=15),
+                    starts_at__lte=models.F('planned_start_at') - timedelta(minutes=1),
                     ends_at__gte=models.F('planned_start_at') + timedelta(minutes=1))
             ),
             name='reservation_valid_timing',
@@ -80,6 +127,12 @@ class Reservation(models.Model):
     def planned_duration_minutes(self):
         if self.planned_start_at:
             return int((self.ends_at - self.planned_start_at).total_seconds() // 60)
+        return None
+
+    @property
+    def preparation_minutes(self):
+        if self.planned_start_at:
+            return int((self.planned_start_at - self.starts_at).total_seconds() // 60)
         return None
 
     def __str__(self):

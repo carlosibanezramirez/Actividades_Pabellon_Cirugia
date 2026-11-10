@@ -1,9 +1,30 @@
+from django import forms
 from django.contrib import admin
+from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 from django.db.models import Q
 from .forms import ProfileUserChangeForm, ProfileUserCreationForm
-from .models import Correction, Doctor, Event, Intervention, Procedure, Reservation, Room, Specialty
+from .models import Correction, Doctor, Event, Intervention, OperatingSettings, Procedure, Reservation, Room, Specialty
+
+
+@admin.register(OperatingSettings)
+class OperatingSettingsAdmin(admin.ModelAdmin):
+    formfield_overrides = {models.TimeField: {'widget': forms.TimeInput(format='%H:%M', attrs={'type': 'time', 'step': 60})}}
+    fieldsets = [
+        ('Preparación del pabellón', {
+            'fields': ['preparation_mean_minutes', 'preparation_max_minutes'],
+            'description': 'La continuidad entre reservas mantiene un máximo de 30 minutos. Un tiempo medio mayor de 30 minutos impedirá encadenar reservas posteriores en el mismo día.',
+        }),
+        ('Horario de reservas', {'fields': ['opening_time', 'closing_time']}),
+    ]
+    list_display = ['__str__', 'preparation_mean_minutes', 'preparation_max_minutes', 'opening_time', 'closing_time']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Room, Procedure)

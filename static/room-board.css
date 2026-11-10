@@ -28,3 +28,5 @@ header nav { justify-content: flex-end; }
 .room-no-record { color: var(--muted); }
 .room-board>.empty { grid-column: 1/-1; }
 @media(max-width:740px) { header nav { justify-content: flex-start; } .room-tile-body { padding: 20px; } }
+
+.room-fuera_horario { --room-color: #dceff8; }

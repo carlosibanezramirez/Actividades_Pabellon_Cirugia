@@ -1,0 +1,4 @@
+<div class="preparation-monitor {% if alarm.exceeded %}is-exceeded{% endif %}" data-preparation-room="{{ alarm.room_id }}" data-rendered-intervention="{{ alarm.intervention_id }}" {% if monitor_intervention %}data-preparation-intervention="{{ alarm.intervention_id }}"{% endif %} data-started-at="{{ alarm.started_at }}" data-maximum="{{ alarm.maximum }}" data-server-now="{{ alarm.server_now }}" {% if not alarm.active %}hidden{% endif %}>
+    <strong class="preparation-alarm-title" role="status">{% if alarm.exceeded %}⚠ Tiempo máximo de preparación excedido{% else %}Preparación en curso{% endif %}</strong>
+    <span class="preparation-clock" aria-live="off">{{ alarm.elapsed_label }}</span><small>Máximo: <span class="preparation-maximum">{{ alarm.maximum }}</span> minutos</small><small class="preparation-stale" hidden>Estado sin actualizar; revise la conexión o actualice la página.</small>
+</div>

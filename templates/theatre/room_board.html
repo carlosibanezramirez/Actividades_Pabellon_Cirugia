@@ -10,6 +10,7 @@
 <article class="room-tile room-{{ card.state }}" aria-labelledby="room-{{ card.room.pk }}">
     <div class="room-marquee"><span class="marquee-dot" aria-hidden="true"></span>{{ card.state_label }}</div>
     <div class="room-tile-body"><h2 id="room-{{ card.room.pk }}">{{ card.room.name }}</h2>
+    {% include 'theatre/_preparation_alarm.html' with alarm=card.alarm %}
     {% if card.state_reason %}<p class="room-reason">{{ card.state_reason }}</p>{% endif %}
     {% if card.intervention %}
         {% if card.finished %}<p class="finished-badge">✓ Finalizada</p>{% else %}<p class="room-record">Intervención #{{ card.intervention.pk }}</p>{% endif %}

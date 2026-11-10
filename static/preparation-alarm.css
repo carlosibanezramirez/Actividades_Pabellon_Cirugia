@@ -1,0 +1,5 @@
+.preparation-monitor { display: flex; flex-direction: column; gap: 5px; padding: 12px; margin: 12px 0; border: 1px solid #ccd9dd; border-radius: 8px; background: #eff5f6; color: #233c46; font-size: 12px; }
+.preparation-monitor[hidden],.preparation-stale[hidden] { display: none; }
+.preparation-monitor.is-exceeded { border: 2px solid #b91c1c; background: #fff0ee; color: #951a1a; }
+.preparation-clock { font-variant-numeric: tabular-nums; font-weight: 750; font-size: 20px; }
+.preparation-stale { color: #815400; }

@@ -2,6 +2,8 @@
 
 Disponible desde **Agenda semanal** o `/agenda-semanal/`. Se elige un pabellón y una fecha; se muestran los siete días de la semana correspondiente, de lunes a domingo. Las flechas permiten cambiar de semana manteniendo el pabellón elegido.
 
+Las 24 horas siguen visibles: las franjas libres anteriores a la apertura y posteriores al cierre aparecen en celeste pálido y no admiten reservas. El horario predeterminado es 07:00–23:00 y la primera preparación puede comenzar antes de las 07:00. [Ver configuración y alarmas](CONFIGURACION.md).
+
 Cada día es una banda continua: verde donde hay disponibilidad, negro en los 15 minutos previos de preparación y rojo en la intervención reservada u ocupada. No se redondean los intervalos a bloques de una hora. Un pabellón desactivado aparece no disponible y no admite reservas. Las reservas creadas en la agenda horaria anterior también bloquean su intervalo exacto en esta vista.
 
 ## Reservar un día
@@ -15,7 +17,7 @@ Al presionar un día se abre únicamente ese día, junto con su disponibilidad y
 - Inicio deseado, exclusivamente a la hora o media hora (`:00` o `:30`).
 - Duración entera en minutos, de 1 a 1440 (hasta 24 horas).
 
-La duración indicada por el médico abarca desde el inicio de preparación de anestesia hasta la salida del paciente. El sistema agrega **15 minutos previos de preparación del pabellón**.
+La duración indicada por el médico abarca desde el inicio de preparación de anestesia hasta la salida del paciente. El sistema agrega el **tiempo medio de preparación configurado por Administración** (15 minutos por defecto). Las menciones de 15 minutos en los ejemplos corresponden a ese valor inicial.
 
 Por ejemplo: inicio solicitado `09:30`, duración `90` minutos. El pabellón queda reservado de **09:15 a 11:00**. Se comprueba disponibilidad para los 105 minutos completos. Una duración de 20 minutos ocupa 35 minutos; no se redondea a una hora.
 
