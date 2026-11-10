@@ -86,14 +86,14 @@ class OperatingSettingsTests(TestCase):
         with self.assertRaises(ValidationError):
             self.reserve(time(6, 30), 60)
         with self.assertRaises(ValidationError):
-            self.reserve(time(22, 30), 31)
-        with self.assertRaises(ValidationError):
-            self.reserve(time(23), 1)
-        booking = self.reserve(time(22, 30), 30)
-        self.assertEqual(timezone.localtime(booking.ends_at).time(), time(23))
+            self.reserve(time(23, 30), 1)
         values = [option['value'] for option in available_starts(self.item.room, self.day)]
         self.assertNotIn('06:30', values)
-        self.assertNotIn('23:00', values)
+        self.assertIn('23:00', values)
+        self.assertNotIn('23:30', values)
+        booking = self.reserve(time(23), 180)
+        self.assertEqual(timezone.localtime(booking.ends_at).time(), time(2))
+        self.assertEqual(timezone.localtime(booking.ends_at).date(), self.day + timedelta(days=1))
 
     def test_closed_segments_remain_visible_and_are_not_bookable_links(self):
         day = continuous_day(self.item.room, self.day)

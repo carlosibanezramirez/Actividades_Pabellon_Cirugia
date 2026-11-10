@@ -41,7 +41,7 @@ class RoomHoursTests(TestCase):
         with self.assertRaises(ValidationError):
             self.reserve(self.other, time(6), 60)
         with self.assertRaises(ValidationError):
-            self.reserve(self.other, time(17, 30), 31)
+            self.reserve(self.other, time(18, 30), 31)
         self.reserve(self.other, time(17, 30), 30)
 
     def test_admin_room_form_has_hours_and_global_preparation_form_does_not(self):

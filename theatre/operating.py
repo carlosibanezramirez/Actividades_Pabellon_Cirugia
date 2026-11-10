@@ -13,9 +13,9 @@ def booking_window(day, room):
 
 def validate_booking_window(day, planned_start, end, room):
     opening, closing = booking_window(day, room)
-    if planned_start < opening or planned_start >= closing or end > closing:
+    if planned_start < opening or planned_start > closing:
         raise ValidationError(
-            f'La reserva debe comenzar desde las {room.opening_time:%H:%M} y terminar '
-            f'a más tardar a las {room.closing_time:%H:%M}. La preparación previa puede '
-            'comenzar antes de la apertura.'
+            f'La reserva debe comenzar entre las {room.opening_time:%H:%M} y las '
+            f'{room.closing_time:%H:%M}, inclusive. Puede terminar después del cierre '
+            'o al día siguiente; la preparación previa puede comenzar antes de la apertura.'
         )

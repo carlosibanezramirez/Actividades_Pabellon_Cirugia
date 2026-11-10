@@ -101,7 +101,7 @@ def availability(day, now=None):
             busy = max(matches, key=lambda p: priority[p['state']]) if matches else None
             state = 'no_disponible' if not room.active else (busy['state'] if busy else 'libre')
             label = 'No disponible' if not room.active else (busy['label'] if busy else 'Libre')
-            outside_hours = slot['start'] < opening or slot['end'] > closing
+            outside_hours = slot['start'] < opening or slot['start'] > closing
             if room.active and not busy and outside_hours:
                 state, label = 'fuera_horario', 'Fuera de horario'
             cells.append({**slot, 'value': f'{room.pk}:{slot["index"]}',

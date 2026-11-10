@@ -134,12 +134,9 @@ class SchedulingTests(TestCase):
 
     def test_last_hour_can_end_next_day_and_short_use_blocks_across_midnight(self):
         last = day_slots(self.day)[-1]
-        with self.assertRaises(ValidationError):
-            self.reserve(last['index'])
-        closing_slot = next(s for s in day_slots(self.day) if timezone.localtime(s['end']).time().hour == 23)
-        booking = self.reserve(closing_slot['index'])
+        booking = self.reserve(last['index'])
         self.assertEqual(booking.ends_at - booking.starts_at, HOUR)
-        self.assertEqual(timezone.localtime(booking.ends_at).date(), self.day)
+        self.assertEqual(timezone.localtime(booking.ends_at).date(), self.day + timedelta(days=1))
         old_day = timezone.localdate() - timedelta(days=2)
         start = day_slots(old_day)[-1]['start'] + timedelta(minutes=45)
         end = start + timedelta(minutes=10)

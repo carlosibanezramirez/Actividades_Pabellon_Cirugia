@@ -94,19 +94,37 @@ class WeeklySchedulingTests(TestCase):
     def test_intervention_crossing_midnight_marks_next_day_and_blocks_hourly_agenda(self):
         with self.assertRaises(ValidationError):
             self.reserve(time(23, 30), 120)
-        planned = timezone.make_aware(datetime.combine(self.day, time(23, 30)))
-        Reservation.objects.create(room=self.room, doctor=self.intervention.doctor,
-                                   procedure=self.intervention.procedure, patient_name='Paciente ficticio histórico',
-                                   starts_at=planned - timedelta(minutes=15), planned_start_at=planned,
-                                   ends_at=planned + timedelta(minutes=120), created_by=self.user)
+        booking = self.reserve(time(23), 180)
+        self.assertEqual(booking.planned_duration_minutes, 180)
+        self.assertEqual(booking.preparation_minutes, 15)
         next_day = self.day + timedelta(days=1)
         following = continuous_day(self.room, next_day)
         busy_minutes = sum((s['end'] - s['start']).total_seconds() // 60 for s in following['segments'] if s['busy'])
-        self.assertEqual(busy_minutes, 90)
+        self.assertEqual(busy_minutes, 120)
         with self.assertRaises(ValidationError):
             reserve_hours(user=self.user, day=next_day, selections=[f'{self.room.pk}:0'],
                           doctor=self.intervention.doctor, procedure=self.intervention.procedure,
                           patient_name='Paciente ficticio horario', patient_rut='12345678-5')
+
+    def test_overnight_reservation_rejects_collision_in_next_day(self):
+        next_day = self.day + timedelta(days=1)
+        self.room.opening_time = time(0)
+        self.room.save()
+        self.reserve(time(1), 60, day=next_day)
+        with self.assertRaises(ValidationError):
+            self.reserve(time(23), 180)
+        self.assertEqual(Reservation.objects.count(), 1)
+
+    def test_overnight_reservation_marks_both_days_and_remains_a_single_booking(self):
+        booking = self.reserve(time(23), 180)
+        first = continuous_day(self.room, self.day)['booking_blocks'][0]
+        following = continuous_day(self.room, self.day + timedelta(days=1))['booking_blocks'][0]
+        self.assertEqual(first['booking'].pk, booking.pk)
+        self.assertEqual(following['booking'].pk, booking.pk)
+        self.assertEqual(len(first['parts']), 2)
+        self.assertEqual(len(following['parts']), 1)
+        self.assertFalse(following['parts'][0]['preparation'])
+        self.assertEqual(Reservation.objects.count(), 1)
 
     def test_only_half_hour_starts_positive_minutes_and_future_preparation_are_accepted(self):
         for clock in [time(9, 15), time(9, 30, 1)]:
