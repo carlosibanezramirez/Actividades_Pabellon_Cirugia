@@ -9,3 +9,13 @@ El cuadro presenta la fecha, el pabellón actual y la hora de inicio solicitada.
 Solo se pueden reprogramar reservas futuras sin intervención asociada. Se requiere el permiso de operación utilizado por la agenda. Los bloqueos de PostgreSQL evitan reservar simultáneamente el mismo tramo y una revisión firmada impide sobrescribir un cambio realizado mientras otro usuario tenía el cuadro abierto. En ese caso se debe cerrar y volver a abrir la reserva.
 
 No requiere migraciones de base de datos.
+
+## Cancelar una reserva
+
+En el cuadro de edición, abrir **Cancelar reserva**, elegir un **Motivo de cancelación** y pulsar **Confirmar cancelación**. El motivo es obligatorio y solo ofrece causas activas. La reserva conserva su registro, fechas originales, causa registrada, fecha de cancelación y usuario que la canceló. Renombrar o desactivar una causa no modifica el motivo histórico guardado.
+
+Las causas se gestionan en **Administración → Causas de cancelación**. Se pueden crear, editar o desactivar; una causa utilizada está protegida contra eliminación. Después de migrar, ejecutar `setup_roles` para habilitar su gestión al perfil Administrador. No se crean causas automáticamente.
+
+La cancelación libera el tramo en ambas agendas, elimina la reserva del contador/listado activo y de la regla de continuidad para nuevas reservas. Solo permite reservas futuras sin intervención asociada. Una reserva cancelada no se puede reprogramar ni utilizar para crear una intervención. Su detalle e historial administrativo siguen disponibles.
+
+Esta funcionalidad requiere aplicar la migración 0013 antes de iniciar la nueva versión web.

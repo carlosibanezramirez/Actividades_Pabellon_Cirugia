@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 from django.db.models import Q
 from .forms import ProfileUserChangeForm, ProfileUserCreationForm
-from .models import Correction, Doctor, Event, Intervention, OperatingSettings, Procedure, Reservation, Room, Specialty
+from .models import CancellationReason, Correction, Doctor, Event, Intervention, OperatingSettings, Procedure, Reservation, Room, Specialty
 
 
 @admin.register(OperatingSettings)
@@ -25,6 +25,7 @@ class OperatingSettingsAdmin(admin.ModelAdmin):
         return False
 
 
+@admin.register(CancellationReason)
 @admin.register(Procedure)
 class CatalogAdmin(admin.ModelAdmin):
     list_display = ['name', 'active']
@@ -106,6 +107,6 @@ class CorrectionAdmin(ReadOnlyAdmin):
 
 @admin.register(Reservation)
 class ReservationAdmin(ReadOnlyAdmin):
-    list_display = ['id', 'room', 'starts_at', 'ends_at', 'doctor', 'procedure', 'patient_name', 'created_by']
+    list_display = ['id', 'room', 'starts_at', 'ends_at', 'doctor', 'procedure', 'patient_name', 'created_by', 'cancelled_at', 'cancellation_reason_name', 'cancelled_by']
     list_filter = ['room', 'doctor']
     search_fields = ['patient_name', 'patient_rut', 'doctor__name']

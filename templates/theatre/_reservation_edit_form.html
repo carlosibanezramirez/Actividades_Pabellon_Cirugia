@@ -1,3 +1,4 @@
+{% if not booking.cancelled_at %}
 <form method="post" action="{% url 'reservation_edit' booking.pk %}" data-reservation-edit-form>
 {% csrf_token %}
 <div class="reservation-edit-summary">
@@ -8,3 +9,12 @@
 {{ form.as_p }}
 <div class="reservation-edit-actions"><button type="button" class="secondary" data-close-reservation-edit>Cancelar</button><button type="submit">Confirmar cambios</button></div>
 </form>
+
+<details class="reservation-cancel-section" {% if cancellation_error %}open{% endif %}>
+<summary>Cancelar reserva</summary>
+<form method="post" action="{% url 'reservation_cancel' booking.pk %}" data-reservation-edit-form>
+{% csrf_token %}{{ cancel_form.as_p }}
+<button type="submit" class="reservation-cancel-button">Confirmar cancelación</button>
+</form>
+</details>
+{% else %}<p class="message">Reserva cancelada: {{ booking.cancellation_reason_name }}</p>{% endif %}

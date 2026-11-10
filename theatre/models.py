@@ -101,6 +101,12 @@ class Doctor(Catalog):
         verbose_name_plural = 'médicos'
 
 
+class CancellationReason(Catalog):
+    class Meta:
+        verbose_name = 'causa de cancelación'
+        verbose_name_plural = 'causas de cancelación'
+
+
 class Reservation(models.Model):
     room = models.ForeignKey(Room, verbose_name='Pabellón', on_delete=models.PROTECT)
     doctor = models.ForeignKey(Doctor, verbose_name='Médico solicitante', on_delete=models.PROTECT)
@@ -112,6 +118,13 @@ class Reservation(models.Model):
     planned_start_at = models.DateTimeField('Inicio solicitado (preparación de anestesia)', null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    cancelled_at = models.DateTimeField('Fecha de cancelación', null=True, blank=True)
+    cancelled_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name='Cancelada por',
+                                     related_name='cancelled_reservations', on_delete=models.PROTECT, null=True, blank=True)
+    cancellation_reason = models.ForeignKey(CancellationReason, verbose_name='Causa de cancelación',
+                                           on_delete=models.PROTECT, null=True, blank=True)
+    cancellation_reason_name = models.CharField('Causa registrada', max_length=180, blank=True)
 
     class Meta:
         ordering = ['starts_at', 'pk']

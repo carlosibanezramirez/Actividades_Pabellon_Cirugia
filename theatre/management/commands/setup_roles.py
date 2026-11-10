@@ -11,7 +11,7 @@ class Command(BaseCommand):
         operator, _ = Group.objects.get_or_create(name='Operador')
         operator.permissions.set([operate])
         administrator, _ = Group.objects.get_or_create(name='Administrador')
-        catalog = Permission.objects.filter(content_type__app_label='theatre', content_type__model__in=['room', 'procedure', 'doctor', 'specialty'])
+        catalog = Permission.objects.filter(content_type__app_label='theatre', content_type__model__in=['room', 'procedure', 'doctor', 'specialty', 'cancellationreason'])
         settings_permissions = Permission.objects.filter(
             content_type__app_label='theatre', content_type__model='operatingsettings',
             codename__in=['view_operatingsettings', 'change_operatingsettings'],
