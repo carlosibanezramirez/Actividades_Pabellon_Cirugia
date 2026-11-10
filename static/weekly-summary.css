@@ -8,11 +8,13 @@ main { max-width: 1920px; }
 .occupancy-day.available { border-top-color: #2e8a48; }
 .occupancy-day.unavailable { border-top-color: #795037; }
 .occupancy-day-heading, .occupancy-day-footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
-.occupancy-day-heading { align-items: flex-start; flex-direction: column; }
-.occupancy-day-heading h3 { margin: 0; font-size: 15px; }
-.reservation-count { background: #eef2f6; padding: 5px 7px; border-radius: 20px; font-size: 12px; }
+.occupancy-day-heading { flex-wrap: nowrap; gap: 4px; }
+.occupancy-day-heading h3 { margin: 0; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reservation-count { flex-shrink: 0; white-space: nowrap; background: #eef2f6; padding: 5px 7px; border-radius: 20px; font-size: 12px; }
 .free-intervals { list-style: none; padding: 0; margin: 12px 0; }
-.free-intervals li { font-size: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 8px 6px; background: #edf8f0; border-left: 3px solid #2e8a48; border-radius: 5px; margin-bottom: 8px; }
+.free-intervals li { margin-bottom: 8px; }
+.free-interval-link { color: inherit; text-decoration: none; font-size: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 8px 6px; background: #edf8f0; border-left: 3px solid #2e8a48; border-radius: 5px; }
+.free-interval-link:hover { background: #d9f2df; }
 .occupancy-day-footer { border-top: 1px solid var(--line); padding-top: 10px; font-size: 12px; }
 
 @media (max-width: 1023px) {
