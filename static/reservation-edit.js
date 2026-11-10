@@ -48,8 +48,12 @@
         window.location.assign(data.redirect_url);
       } else if (response.status === 422) {
         content.innerHTML = await response.text();
-        content.querySelector('.errorlist')?.setAttribute('role', 'alert');
-        content.querySelector('input:not([type=hidden]), select')?.focus();
+        const errors = content.querySelector('.errorlist');
+        if (errors) {
+          errors.setAttribute('role', 'alert');
+          errors.tabIndex = -1;
+          errors.focus();
+        }
       } else {
         error('No se pudo confirmar el cambio. Cierre el cuadro y consulte la agenda antes de intentarlo nuevamente.');
       }

@@ -23,7 +23,7 @@ def week_start(day):
 def validate_start_gap(room, day, planned, exclude_id=None):
     day_start = day_slots(day)[0]['start']
     previous = Reservation.objects.filter(
-        room=room, ends_at__gt=day_start, ends_at__lte=planned,
+        room=room, cancelled_at__isnull=True, ends_at__gt=day_start, ends_at__lte=planned,
     ).exclude(pk=exclude_id).order_by('-ends_at', '-pk').first()
     if previous and planned - previous.ends_at > MAX_START_GAP:
         ended = timezone.localtime(previous.ends_at).strftime('%H:%M')
@@ -223,7 +223,8 @@ def validate_reservation_space(room, day, planned, start, end, now, preparation_
 
 def reservation_revision(booking):
     return [booking.room_id, booking.starts_at.isoformat(), booking.ends_at.isoformat(),
-            booking.planned_start_at.isoformat() if booking.planned_start_at else None]
+            booking.planned_start_at.isoformat() if booking.planned_start_at else None,
+            booking.cancelled_at.isoformat() if booking.cancelled_at else None]
 
 
 @transaction.atomic
@@ -245,7 +246,7 @@ def reschedule_reservation(*, user, reservation_id, room, day, desired_time, exp
         raise ValidationError('La reserva cambió mientras se editaba. Cierre el cuadro y vuelva a abrirla.')
     from .models import Intervention
     now = timezone.now()
-    if Intervention.objects.filter(reservation_id=booking.pk).exists() or booking.starts_at <= now:
+    if booking.cancelled_at or Intervention.objects.filter(reservation_id=booking.pk).exists() or booking.starts_at <= now:
         raise ValidationError('Solo se pueden reprogramar reservas futuras sin una intervención asociada.')
     destination = rooms.get(room.pk)
     if destination is None or not destination.active:
@@ -263,4 +264,28 @@ def reschedule_reservation(*, user, reservation_id, room, day, desired_time, exp
     if booking.planned_start_at is not None:
         booking.planned_start_at = planned
     booking.save(update_fields=['room', 'starts_at', 'ends_at', 'planned_start_at'])
+    return booking
+
+
+@transaction.atomic
+def cancel_reservation(*, user, reservation_id, reason, expected_revision):
+    require_permission(user, 'theatre.operate_intervention')
+    old_room_id = Reservation.objects.values_list('room_id', flat=True).get(pk=reservation_id)
+    Room.objects.select_for_update().get(pk=old_room_id)
+    booking = Reservation.objects.select_for_update().get(pk=reservation_id)
+    if reservation_revision(booking) != expected_revision or booking.room_id != old_room_id:
+        raise ValidationError('La reserva cambió mientras se editaba. Cierre el cuadro y vuelva a abrirla.')
+    from .models import CancellationReason, Intervention
+    if booking.cancelled_at:
+        raise ValidationError('Esta reserva ya fue cancelada.')
+    if booking.starts_at <= timezone.now() or Intervention.objects.filter(reservation_id=booking.pk).exists():
+        raise ValidationError('Solo se pueden cancelar reservas futuras sin una intervención asociada.')
+    cause = CancellationReason.objects.select_for_update().filter(pk=reason.pk, active=True).first()
+    if cause is None:
+        raise ValidationError('Seleccione una causa de cancelación activa.')
+    booking.cancelled_at = timezone.now()
+    booking.cancelled_by = user
+    booking.cancellation_reason = cause
+    booking.cancellation_reason_name = cause.name
+    booking.save(update_fields=['cancelled_at', 'cancelled_by', 'cancellation_reason', 'cancellation_reason_name'])
     return booking

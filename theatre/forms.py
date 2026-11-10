@@ -2,7 +2,7 @@ from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group
-from .models import Doctor, Intervention, Procedure, Reservation, Room
+from .models import CancellationReason, Doctor, Intervention, Procedure, Reservation, Room
 from .rut import normalize_rut
 
 
@@ -170,3 +170,8 @@ class RescheduleReservationForm(AgendaDateForm):
         if day.year > 9997:
             raise forms.ValidationError('Seleccione una fecha hasta el año 9997.')
         return day
+
+
+class CancelReservationForm(forms.Form):
+    reason = forms.ModelChoiceField(label='Motivo de cancelación', queryset=CancellationReason.objects.filter(active=True))
+    revision = forms.CharField(widget=forms.HiddenInput)

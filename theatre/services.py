@@ -25,6 +25,8 @@ def create_intervention(*, user, room, procedure, doctor, anesthetist, reservati
     now = timezone.now()
     if reservation:
         reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
+        if reservation.cancelled_at:
+            raise ValidationError('La reserva está cancelada.')
         if (reservation.room_id != locked_room.pk or reservation.doctor_id != doctor.pk
                 or reservation.procedure_id != procedure.pk):
             raise ValidationError('El pabellón, médico y tipo de cirugía deben coincidir con la reserva.')
@@ -33,7 +35,7 @@ def create_intervention(*, user, room, procedure, doctor, anesthetist, reservati
         if Intervention.objects.filter(reservation=reservation).exists():
             raise ValidationError('La reserva ya tiene una intervención asociada.')
     expected_end = reservation.ends_at if reservation and reservation.planned_start_at else now + HOUR
-    bookings = Reservation.objects.filter(room=locked_room, starts_at__lt=expected_end, ends_at__gt=now)
+    bookings = Reservation.objects.filter(cancelled_at__isnull=True, room=locked_room, starts_at__lt=expected_end, ends_at__gt=now)
     if reservation:
         bookings = bookings.exclude(pk=reservation.pk)
     if bookings.exists():
