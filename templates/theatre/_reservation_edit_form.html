@@ -2,8 +2,8 @@
 {% csrf_token %}
 <div class="reservation-edit-summary">
 <p><strong>{{ booking.procedure }}</strong></p>
-<p>{{ booking.patient_name }} · RUT: {{ booking.patient_rut|default:'No registrado' }}</p>
-<p>{{ booking.doctor }}</p>
+<p><strong>Paciente:</strong> {{ booking.patient_name }} · RUT: {{ booking.patient_rut|default:'No registrado' }}</p>
+<p><strong>Cirujano:</strong> {{ booking.doctor }}</p>
 </div>
 {{ form.as_p }}
 <div class="reservation-edit-actions"><button type="button" class="secondary" data-close-reservation-edit>Cancelar</button><button type="submit">Confirmar cambios</button></div>
