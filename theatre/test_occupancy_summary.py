@@ -46,7 +46,8 @@ class WeeklyOccupancySummaryTests(TestCase):
         self.assertContains(response, '230 mins. disp.')
         self.assertContains(response, '18:50 – 21:00')
         self.assertContains(response, '130 mins. disp.')
-        self.assertContains(response, '3 reservas activas')
+        self.assertContains(response, '3 rsvs')
+        self.assertContains(response, f'href="{reverse("weekly_day", args=[self.room.pk, self.monday.isoformat()])}#continuous-reservation-form"')
         self.assertNotContains(response, 'Paciente ficticio resumen')
 
     def test_gaps_below_75_minutes_are_hidden_and_excluded_from_total(self):

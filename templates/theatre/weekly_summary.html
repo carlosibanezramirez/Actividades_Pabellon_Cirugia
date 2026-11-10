@@ -14,9 +14,9 @@
 <tbody>{% for row in rooms %}<tr>
 {% for day in row.days %}<td>
 <article class="card occupancy-day {% if not row.room.active %}unavailable{% elif day.intervals %}available{% else %}full{% endif %}">
-<div class="occupancy-day-heading"><h3>{{ row.room.name }}</h3><span class="reservation-count" title="Reservas pendientes o en curso, con término futuro">{{ day.active_count }} reserva{{ day.active_count|pluralize }} activa{{ day.active_count|pluralize }}</span></div>
+<div class="occupancy-day-heading"><h3 title="{{ row.room.name }}">{{ row.room.name }}</h3><span class="reservation-count" title="Reservas pendientes o en curso, con término futuro">{{ day.active_count }} rsvs</span></div>
 {% if not row.room.active %}<p>Pabellón no disponible.</p>{% elif day.past %}<p class="muted">Fecha pasada.</p>{% elif day.intervals %}
-<ul class="free-intervals">{% for interval in day.intervals %}<li><span>{{ interval.start|date:'H:i' }} – {{ interval.end|date:'H:i' }}</span><strong>{{ interval.minutes }} mins. disp.</strong></li>{% endfor %}</ul>
+<ul class="free-intervals">{% for interval in day.intervals %}<li><a class="free-interval-link" href="{% url 'weekly_day' row.room.pk day.date|date:'Y-m-d' %}#continuous-reservation-form" aria-label="Reservar en {{ row.room.name }}, {{ day.date|date:'d/m/Y' }}, tramo {{ interval.start|date:'H:i' }} a {{ interval.end|date:'H:i' }}"><span>{{ interval.start|date:'H:i' }} – {{ interval.end|date:'H:i' }}</span><strong>{{ interval.minutes }} mins. disp.</strong></a></li>{% endfor %}</ul>
 <div class="occupancy-day-footer"><a href="{% url 'weekly_day' row.room.pk day.date|date:'Y-m-d' %}">Ver día y reservar →</a></div>
 {% else %}<p class="muted">Sin tramos de al menos 75 minutos.</p>{% endif %}
 </article>
