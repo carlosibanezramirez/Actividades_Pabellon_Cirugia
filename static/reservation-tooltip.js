@@ -51,7 +51,7 @@
     });
     block.addEventListener('focus', () => show(block));
     block.addEventListener('blur', hide);
-    block.addEventListener('click', () => show(block));
+    block.addEventListener('click', () => block.dataset.editUrl ? hide() : show(block));
   });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
   document.addEventListener('pointerdown', event => {

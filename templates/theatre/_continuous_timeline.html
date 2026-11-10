@@ -4,7 +4,7 @@
     {% if day_link %}{% for segment in day.segments %}{% if not segment.busy and not segment.closed %}<a class="timeline-day-link" style="top:{{ segment.top }}%;height:{{ segment.height }}%;" href="{{ day_link }}{% if segment.suggested_time %}?inicio={{ segment.suggested_time|urlencode }}#continuous-reservation-form{% elif not segment.has_start %}?sin_inicio=1#continuous-reservation-form{% endif %}" {% if segment.suggested_time %}title="Inicio sugerido: {{ segment.suggested_time }}"{% elif not segment.has_start %}title="No hay inicio compatible con la preparación y el máximo de 30 minutos."{% endif %} aria-label="Consultar tramo libre del {{ day.date|date:'d/m/Y' }}{% if segment.suggested_time %}. Inicio sugerido: {{ segment.suggested_time }}{% endif %}"><span class="visually-hidden">Ver día y reservar{% if segment.suggested_time %} desde {{ segment.suggested_time }}{% endif %}</span></a>{% endif %}{% endfor %}{% endif %}
     {% for block in day.booking_blocks %}
     {% for part in block.parts %}
-    <button type="button" class="reservation-block {% if part.compact %}compact{% endif %} {% if part.preparation %}preparation-block{% endif %}" style="top:{{ part.top }}%;height:{{ part.height }}%;" data-booking-tooltip
+    <button type="button" class="reservation-block {% if part.compact %}compact{% endif %} {% if part.preparation %}preparation-block{% endif %}" style="top:{{ part.top }}%;height:{{ part.height }}%;" data-booking-tooltip data-edit-url="{% url 'reservation_edit' block.booking.pk %}" aria-haspopup="dialog"
         data-phase="{% if part.preparation %}Preparación del pabellón{% else %}Intervención programada{% endif %}"
         data-phase-hours="{{ block.booking.starts_at|date:'H:i' }} – {{ block.booking.ends_at|date:'H:i' }}"
         data-surgery="{{ block.booking.procedure }}" data-doctor="{{ block.booking.doctor }}"
@@ -12,7 +12,7 @@
         data-duration="{{ block.duration_minutes }}"
         data-total-duration="{{ block.total_duration_minutes }}"
         data-patient="{{ block.booking.patient_name }}" data-rut="{{ block.booking.patient_rut|default:'No registrado' }}"
-        aria-label="Reserva #{{ block.booking.pk }}: {{ block.booking.procedure }}, {{ block.booking.doctor }}, {{ block.booking.starts_at|date:'H:i' }} a {{ block.booking.ends_at|date:'H:i' }}. Ver datos del paciente.">
+        aria-label="Reserva #{{ block.booking.pk }}: {{ block.booking.procedure }}, {{ block.booking.doctor }}, {{ block.booking.starts_at|date:'H:i' }} a {{ block.booking.ends_at|date:'H:i' }}. Editar reserva.">
         {% if not part.preparation %}<span class="reservation-block-title">{{ block.booking.procedure }}</span>
         <span>{{ block.booking.doctor }}</span>
         <span class="reservation-block-hours">{{ part.start|date:'H:i' }} – {{ part.end|date:'H:i' }}</span>{% endif %}

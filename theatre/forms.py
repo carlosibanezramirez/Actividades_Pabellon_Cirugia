@@ -154,3 +154,19 @@ class ContinuousReservationForm(forms.Form):
         if self.allowed_times is not None and value.strftime('%H:%M') not in self.allowed_times:
             raise forms.ValidationError('Seleccione un horario disponible que respete el máximo de 30 minutos desde el procedimiento anterior.')
         return value
+
+
+class RescheduleReservationForm(AgendaDateForm):
+    room = forms.ModelChoiceField(label='Pabellón', queryset=Room.objects.filter(active=True))
+    desired_time = forms.TimeField(
+        label='Hora de inicio', input_formats=['%H:%M'],
+        widget=forms.Select(choices=[(f'{h:02d}:{m:02d}', f'{h:02d}:{m:02d}')
+                                     for h in range(24) for m in [0, 30]]),
+    )
+    revision = forms.CharField(widget=forms.HiddenInput)
+
+    def clean_fecha(self):
+        day = super().clean_fecha()
+        if day.year > 9997:
+            raise forms.ValidationError('Seleccione una fecha hasta el año 9997.')
+        return day

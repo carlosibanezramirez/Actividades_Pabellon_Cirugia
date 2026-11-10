@@ -1,0 +1,7 @@
+<form method="post" action="{% url 'reservation_edit' booking.pk %}" data-reservation-edit-form>
+{% csrf_token %}
+<p><strong>{{ booking.procedure }}</strong> · {{ booking.doctor }}</p>
+<p class="muted">Se conservan el paciente, el médico, el tipo de cirugía y la duración de la reserva{% if booking.planned_start_at %} ({{ booking.planned_duration_minutes }} minutos y {{ booking.preparation_minutes }} minutos de preparación){% endif %}.</p>
+{{ form.as_p }}
+<div class="reservation-edit-actions"><button type="button" class="secondary" data-close-reservation-edit>Cancelar</button><button type="submit">Confirmar cambios</button></div>
+</form>

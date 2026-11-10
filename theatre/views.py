@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
+from django.core import signing
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError
@@ -10,10 +11,10 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
 from django.utils import timezone
 from urllib.parse import urlencode
-from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm, WeeklySummaryForm
+from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm, WeeklySummaryForm, RescheduleReservationForm
 from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
 from .models import Event, Intervention, OperatingSettings, Reservation, Room
-from .weekly_scheduling import continuous_day, reserve_continuous, week_start
+from .weekly_scheduling import continuous_day, reserve_continuous, week_start, reschedule_reservation, reservation_revision
 from .scheduling import availability, reserve_hours
 from .services import correct_event, create_intervention, record_event
 from .occupancy_summary import weekly_occupancy_summary
@@ -151,6 +152,37 @@ def reservation_detail(request, pk):
         'booking': booking,
         'can_start': not hasattr(booking, 'intervention') and booking.starts_at <= timezone.now() < booking.ends_at,
     })
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def reservation_edit(request, pk):
+    booking = get_object_or_404(Reservation.objects.select_related('room', 'procedure', 'doctor'), pk=pk)
+    planned = timezone.localtime(booking.planned_start_at or booking.starts_at)
+    initial = {'room': booking.room_id, 'fecha': planned.date(), 'desired_time': planned.strftime('%H:%M'),
+               'revision': signing.dumps(reservation_revision(booking), salt='reservation-edit')}
+    form = RescheduleReservationForm(request.POST if request.method == 'POST' else None, initial=initial)
+    if request.method == 'POST' and form.is_valid():
+        try:
+            revision = signing.loads(form.cleaned_data['revision'], salt='reservation-edit')
+            updated = reschedule_reservation(
+                user=request.user, reservation_id=booking.pk, room=form.cleaned_data['room'],
+                day=form.cleaned_data['fecha'], desired_time=form.cleaned_data['desired_time'],
+                expected_revision=revision,
+            )
+        except signing.BadSignature:
+            form.add_error(None, 'No se pudo validar la edición. Cierre el cuadro y vuelva a abrir la reserva.')
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            messages.success(request, 'Reserva actualizada correctamente.')
+            return JsonResponse({'redirect_url': reverse('weekly_agenda') + '?' + urlencode({
+                'room': updated.room_id,
+                'fecha': timezone.localdate(updated.planned_start_at or updated.starts_at).isoformat(),
+            })})
+    return render(request, 'theatre/_reservation_edit_form.html', {'form': form, 'booking': booking},
+                  status=422 if request.method == 'POST' else 200)
 
 
 @login_required

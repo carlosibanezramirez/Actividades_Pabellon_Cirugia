@@ -10,4 +10,5 @@
 <div class="week-scroll"><div class="week-grid">{% for day in days %}{% url 'weekly_day' room.pk day.date|date:'Y-m-d' as day_link %}<article class="week-day"><a class="week-day-heading" href="{{ day_link }}" aria-label="{{ day.weekday }} {{ day.date|date:'d/m/Y' }}: consultar y reservar"><strong>{{ day.weekday }}</strong><span>{{ day.date|date:'d/m' }}</span><small>{{ day.free_minutes }} min libres{% if day.hours != 24 %} · día de {{ day.hours }} h{% endif %}</small></a>{% include 'theatre/_continuous_timeline.html' %}<a class="open-day" href="{{ day_link }}">Ver día y reservar →</a></article>{% endfor %}</div></div>
 {% endif %}
 <script src="{% static 'reservation-tooltip.js' %}" defer></script>
+{% include 'theatre/_reservation_edit_dialog.html' %}
 {% endblock %}

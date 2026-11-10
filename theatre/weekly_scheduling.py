@@ -20,11 +20,11 @@ def week_start(day):
     return day - timedelta(days=day.weekday())
 
 
-def validate_start_gap(room, day, planned):
+def validate_start_gap(room, day, planned, exclude_id=None):
     day_start = day_slots(day)[0]['start']
     previous = Reservation.objects.filter(
         room=room, ends_at__gt=day_start, ends_at__lte=planned,
-    ).order_by('-ends_at', '-pk').first()
+    ).exclude(pk=exclude_id).order_by('-ends_at', '-pk').first()
     if previous and planned - previous.ends_at > MAX_START_GAP:
         ended = timezone.localtime(previous.ends_at).strftime('%H:%M')
         raise ValidationError(
@@ -200,15 +200,67 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
     validate_booking_window(day, planned, end, locked_room)
     if not Doctor.objects.filter(pk=doctor.pk, active=True).exists() or not Procedure.objects.filter(pk=procedure.pk, active=True).exists():
         raise ValidationError('Seleccione un médico y un tipo de cirugía activos.')
-    cursor = timezone.localdate(start)
-    last_day = timezone.localdate(end)
-    while cursor <= last_day:
-        _, periods = occupancy(cursor, now, locked_room.pk, minimum_use=timedelta(0))
-        if any(period['start'] < end and period['end'] > start for period in periods):
-            raise ValidationError(f'No hay espacio para el intervalo completo, incluidos los {policy.preparation_mean_minutes} minutos previos de preparación. Elija otro horario.')
-        cursor += timedelta(days=1)
-    validate_start_gap(locked_room, day, planned)
+    validate_reservation_space(locked_room, day, planned, start, end, now, policy.preparation_mean_minutes)
     return Reservation.objects.create(
         room=locked_room, doctor=doctor, procedure=procedure, patient_name=patient_name, patient_rut=patient_rut,
         starts_at=start, planned_start_at=planned, ends_at=end, created_by=user,
     )
+
+
+def validate_reservation_space(room, day, planned, start, end, now, preparation_minutes, exclude_id=None):
+    validate_booking_window(day, planned, end, room)
+    cursor = timezone.localdate(start)
+    last_day = timezone.localdate(end)
+    while cursor <= last_day:
+        _, periods = occupancy(cursor, now, room.pk, minimum_use=timedelta(0))
+        if any(period['start'] < end and period['end'] > start
+               for period in periods
+               if not (period['reservation'] and period['reservation'].pk == exclude_id)):
+            raise ValidationError(f'No hay espacio para el intervalo completo, incluidos los {preparation_minutes} minutos previos de preparación. Elija otro horario.')
+        cursor += timedelta(days=1)
+    validate_start_gap(room, day, planned, exclude_id=exclude_id)
+
+
+def reservation_revision(booking):
+    return [booking.room_id, booking.starts_at.isoformat(), booking.ends_at.isoformat(),
+            booking.planned_start_at.isoformat() if booking.planned_start_at else None]
+
+
+@transaction.atomic
+def reschedule_reservation(*, user, reservation_id, room, day, desired_time, expected_revision):
+    require_permission(user, 'theatre.operate_intervention')
+    if not 1900 <= day.year <= 9997:
+        raise ValidationError('Seleccione una fecha entre los años 1900 y 9997.')
+    if desired_time.minute not in (0, 30) or desired_time.second or desired_time.microsecond or desired_time.tzinfo:
+        raise ValidationError('El inicio solicitado debe ser a la hora o media hora.')
+    planned = DateTimeField().clean(datetime.combine(day, desired_time)).astimezone(datetime_timezone.utc)
+    old_room_id = Reservation.objects.values_list('room_id', flat=True).get(pk=reservation_id)
+    # Mismo orden de bloqueos que la creación de reservas/intervenciones.
+    # El orden de pabellones evita interbloqueos entre traslados opuestos.
+    rooms = {item.pk: item for item in Room.objects.select_for_update().filter(
+        pk__in=sorted({old_room_id, room.pk}),
+    ).order_by('pk')}
+    booking = Reservation.objects.select_for_update().get(pk=reservation_id)
+    if booking.room_id != old_room_id or reservation_revision(booking) != expected_revision:
+        raise ValidationError('La reserva cambió mientras se editaba. Cierre el cuadro y vuelva a abrirla.')
+    from .models import Intervention
+    now = timezone.now()
+    if Intervention.objects.filter(reservation_id=booking.pk).exists() or booking.starts_at <= now:
+        raise ValidationError('Solo se pueden reprogramar reservas futuras sin una intervención asociada.')
+    destination = rooms.get(room.pk)
+    if destination is None or not destination.active:
+        raise ValidationError('El pabellón no está disponible.')
+    old_planned = booking.planned_start_at or booking.starts_at
+    preparation = old_planned - booking.starts_at
+    duration = booking.ends_at - old_planned
+    start, end = planned - preparation, planned + duration
+    if start < now:
+        raise ValidationError('El inicio de preparación no puede estar en el pasado.')
+    validate_reservation_space(destination, day, planned, start, end, now,
+                               int(preparation.total_seconds() // 60), exclude_id=booking.pk)
+    booking.room = destination
+    booking.starts_at, booking.ends_at = start, end
+    if booking.planned_start_at is not None:
+        booking.planned_start_at = planned
+    booking.save(update_fields=['room', 'starts_at', 'ends_at', 'planned_start_at'])
+    return booking
