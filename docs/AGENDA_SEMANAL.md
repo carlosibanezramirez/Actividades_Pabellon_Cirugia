@@ -10,6 +10,7 @@ Al presionar un día se abre únicamente ese día, junto con su disponibilidad y
 
 - Médico solicitante.
 - Nombre del paciente.
+- RUT del paciente, con dígito verificador válido. Se normaliza al formato sin puntos y con guion.
 - Tipo de cirugía.
 - Inicio deseado, exclusivamente a la hora o media hora (`:00` o `:30`).
 - Duración entera en minutos, de 1 a 1440 (hasta 24 horas).
@@ -23,6 +24,10 @@ El comienzo de los 15 minutos previos no puede estar en el pasado. Se rechaza cu
 La preparación puede comenzar el día anterior y la intervención puede terminar el siguiente; se comprueban y colorean todos los días afectados. Tras guardar se vuelve al día seleccionado con el tramo ocupado en rojo, un mensaje con el horario completo y la reserva en el listado.
 
 Los horarios se guardan en UTC y se muestran en America/Santiago. En cambios de hora se usan duraciones reales; se rechazan horas de inicio inexistentes o ambiguas. La escala continua contempla días de 23 o 25 horas.
+
+Cada reserva muestra dentro de su tramo rojo el tipo de cirugía, el médico y el horario reservado completo (incluidos los 15 minutos previos). Las reservas contiguas conservan textos separados. Al pasar el mouse, enfocar con teclado o tocar el bloque se muestra un recuadro con esos datos más el nombre y RUT del paciente. Escape o un toque fuera cierran el recuadro. En tramos cortos o columnas estrechas el texto interior puede recortarse; el recuadro conserva el detalle completo sin agrandar artificialmente el intervalo horario.
+
+El RUT es obligatorio para las nuevas reservas en ambas agendas. Las reservas existentes sin RUT mantienen sus datos y muestran «No registrado»; la migración no les asigna un identificador ficticio. Estos detalles siguen protegidos por autenticación y permiso de acceso a las intervenciones.
 
 ## Convivencia con la agenda anterior
 

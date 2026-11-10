@@ -8,6 +8,7 @@ from django.utils import timezone
 from .models import Doctor, Procedure, Reservation, Room
 from .scheduling import occupancy
 from .services import require_permission
+from .rut import normalize_rut
 
 
 PREPARATION = timedelta(minutes=15)
@@ -57,17 +58,29 @@ def continuous_day(room, day, now=None):
         ticks.append({'position': f'{100 * (tick - start).total_seconds() / total:.6f}', 'label': f'{hour:02d}:00'})
     ticks.append({'position': '100', 'label': '24:00'})
     bookings = {p['reservation'].pk: p['reservation'] for p in periods if p['reservation']}
+    blocks = []
+    for booking in sorted(bookings.values(), key=lambda item: (item.starts_at, item.pk)):
+        left, right = max(start, booking.starts_at), min(end, booking.ends_at)
+        if left < right:
+            blocks.append({
+                'booking': booking,
+                'top': f'{100 * (left - start).total_seconds() / total:.6f}',
+                'height': f'{100 * (right - left).total_seconds() / total:.6f}',
+                'compact': (right - left).total_seconds() <= 90 * 60,
+            })
     return {
         'date': day, 'weekday': WEEKDAYS[day.weekday()], 'segments': segments,
         'ticks': ticks, 'hours': int(total // 3600), 'active': room.active,
         'free_minutes': int(sum((s['end'] - s['start']).total_seconds() for s in segments if not s['busy']) // 60),
         'bookings': sorted(bookings.values(), key=lambda booking: (booking.starts_at, booking.pk)),
+        'booking_blocks': blocks,
     }
 
 
 @transaction.atomic
-def reserve_continuous(*, user, room, day, desired_time, duration_minutes, doctor, procedure, patient_name):
+def reserve_continuous(*, user, room, day, desired_time, duration_minutes, doctor, procedure, patient_name, patient_rut=''):
     require_permission(user, 'theatre.operate_intervention')
+    patient_rut = normalize_rut(patient_rut)
     if not 1900 <= day.year <= 9997:
         raise ValidationError('Seleccione una fecha entre los años 1900 y 9997.')
     if desired_time.minute not in (0, 30) or desired_time.second or desired_time.microsecond or desired_time.tzinfo:
@@ -96,6 +109,6 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
             raise ValidationError('No hay espacio para el intervalo completo, incluidos los 15 minutos previos de preparación. Elija otro horario.')
         cursor += timedelta(days=1)
     return Reservation.objects.create(
-        room=locked_room, doctor=doctor, procedure=procedure, patient_name=patient_name,
+        room=locked_room, doctor=doctor, procedure=procedure, patient_name=patient_name, patient_rut=patient_rut,
         starts_at=start, planned_start_at=planned, ends_at=end, created_by=user,
     )

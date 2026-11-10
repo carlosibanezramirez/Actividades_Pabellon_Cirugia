@@ -1,4 +1,16 @@
 <div class="continuous-timeline {% if not day.active %}inactive{% endif %}" aria-label="Disponibilidad continua del {{ day.date|date:'d/m/Y' }}">
     <div class="timeline-spans">{% for segment in day.segments %}<span class="continuous-span {% if segment.busy %}occupied{% else %}free{% endif %}" style="top:{{ segment.top }}%;height:{{ segment.height }}%;" title="{{ segment.label }} · {{ segment.start|date:'d/m H:i' }}–{{ segment.end|date:'d/m H:i' }}"><span class="visually-hidden">{{ segment.label }}: {{ segment.start|date:'d/m H:i' }} a {{ segment.end|date:'d/m H:i' }}.</span></span>{% endfor %}</div>
     <div class="time-ruler" aria-hidden="true">{% for tick in day.ticks %}<span style="top:{{ tick.position }}%;">{{ tick.label }}</span>{% endfor %}</div>
+    {% if day_link %}<a class="timeline-day-link" href="{{ day_link }}" aria-label="Consultar y reservar el {{ day.date|date:'d/m/Y' }}"><span class="visually-hidden">Ver día y reservar</span></a>{% endif %}
+    {% for block in day.booking_blocks %}
+    <button type="button" class="reservation-block {% if block.compact %}compact{% endif %}" style="top:{{ block.top }}%;height:{{ block.height }}%;" data-booking-tooltip
+        data-surgery="{{ block.booking.procedure }}" data-doctor="{{ block.booking.doctor }}"
+        data-hours="{{ block.booking.starts_at|date:'d/m H:i' }} – {{ block.booking.ends_at|date:'d/m H:i' }}"
+        data-patient="{{ block.booking.patient_name }}" data-rut="{{ block.booking.patient_rut|default:'No registrado' }}"
+        aria-label="Reserva #{{ block.booking.pk }}: {{ block.booking.procedure }}, {{ block.booking.doctor }}, {{ block.booking.starts_at|date:'H:i' }} a {{ block.booking.ends_at|date:'H:i' }}. Ver datos del paciente.">
+        <span class="reservation-block-title">{{ block.booking.procedure }}</span>
+        <span>{{ block.booking.doctor }}</span>
+        <span class="reservation-block-hours">{{ block.booking.starts_at|date:'H:i' }} – {{ block.booking.ends_at|date:'H:i' }}</span>
+    </button>
+    {% endfor %}
 </div>

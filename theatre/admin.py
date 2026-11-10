@@ -82,4 +82,4 @@ class CorrectionAdmin(ReadOnlyAdmin):
 class ReservationAdmin(ReadOnlyAdmin):
     list_display = ['id', 'room', 'starts_at', 'ends_at', 'doctor', 'procedure', 'patient_name', 'created_by']
     list_filter = ['room', 'doctor']
-    search_fields = ['patient_name', 'doctor__name']
+    search_fields = ['patient_name', 'patient_rut', 'doctor__name']

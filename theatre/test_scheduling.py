@@ -28,7 +28,7 @@ class SchedulingTests(TestCase):
         args = dict(user=self.user, day=self.day,
                     selections=[f'{(room or self.room).pk}:{index}' for index in indexes],
                     doctor=self.intervention.doctor, procedure=self.intervention.procedure,
-                    patient_name='Paciente ficticio de prueba')
+                    patient_name='Paciente ficticio de prueba', patient_rut='12345678-5')
         args.update(overrides)
         return reserve_hours(**args)
 
@@ -68,7 +68,7 @@ class SchedulingTests(TestCase):
 
     def test_inactive_room_doctor_procedure_and_missing_patient_rejected(self):
         with self.assertRaises(ValidationError):
-            self.reserve(9, patient_name='  ')
+            self.reserve(9, patient_name='  ', patient_rut='12345678-5')
         self.room.active = False
         self.room.save()
         with self.assertRaises(ValidationError):
@@ -96,7 +96,7 @@ class SchedulingTests(TestCase):
         start = day_slots(self.day)[9]['start']
         with self.assertRaises(IntegrityError), transaction.atomic():
             Reservation.objects.create(room=self.room, doctor=self.intervention.doctor,
-                                       procedure=self.intervention.procedure, patient_name='Paciente ficticio',
+                                       procedure=self.intervention.procedure, patient_name='Paciente ficticio', patient_rut='12345678-5',
                                        starts_at=start, ends_at=start + timedelta(minutes=30), created_by=self.user)
 
     def test_real_short_use_blocks_at_least_one_hour_including_preparation(self):
@@ -165,7 +165,7 @@ class SchedulingTests(TestCase):
         self.assertContains(response, day_slots(self.day)[9]['label'])
         data = {'fecha': self.day.isoformat(), 'slots': [f'{self.room.pk}:9', f'{self.room.pk}:10'],
                 'doctor': self.intervention.doctor_id, 'procedure': self.intervention.procedure_id,
-                'patient_name': 'Paciente ficticio formulario'}
+                'patient_name': 'Paciente ficticio formulario', 'patient_rut': '12345678-5'}
         response = self.client.post(reverse('agenda'), data)
         self.assertEqual(response.status_code, 302)
         booking = Reservation.objects.get()
@@ -241,7 +241,7 @@ class ReservationConcurrencyTests(TransactionTestCase):
                 if action == 'reserve':
                     reserve_hours(user=actor, day=day, selections=[f'{item.room_id}:9'],
                                   doctor=item.doctor, procedure=item.procedure,
-                                  patient_name='Paciente ficticio simultáneo')
+                                  patient_name='Paciente ficticio simultáneo', patient_rut='12345678-5')
                 else:
                     create_intervention(user=actor, room=item.room, doctor=item.doctor,
                                         procedure=item.procedure, anesthetist=item.anesthetist)
@@ -269,7 +269,7 @@ class ReservationConcurrencyTests(TransactionTestCase):
                 reserve_hours(user=actor, day=day,
                               selections=[f'{intervention.room_id}:{index}' for index in indexes],
                               doctor=intervention.doctor, procedure=intervention.procedure,
-                              patient_name='Paciente ficticio concurrente')
+                              patient_name='Paciente ficticio concurrente', patient_rut='12345678-5')
                 return 'ok'
             except ValidationError:
                 return 'rejected'

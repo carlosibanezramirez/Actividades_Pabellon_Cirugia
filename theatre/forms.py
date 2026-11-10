@@ -3,6 +3,16 @@ from django import forms
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group
 from .models import Doctor, Intervention, Procedure, Reservation, Room
+from .rut import normalize_rut
+
+
+class RutField(forms.CharField):
+    def __init__(self, **kwargs):
+        super().__init__(label='RUT del paciente', max_length=16,
+                         help_text='Con dígito verificador; puede ingresarse con o sin puntos.', **kwargs)
+
+    def clean(self, value):
+        return normalize_rut(super().clean(value))
 
 
 def profile_field():
@@ -84,6 +94,7 @@ class ReservationRequestForm(forms.Form):
     doctor = forms.ModelChoiceField(label='Médico solicitante', queryset=Doctor.objects.filter(active=True))
     procedure = forms.ModelChoiceField(label='Tipo de cirugía', queryset=Procedure.objects.filter(active=True))
     patient_name = forms.CharField(label='Nombre del paciente', max_length=180)
+    patient_rut = RutField()
 
     def __init__(self, *args, day=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -111,6 +122,7 @@ class WeeklyAgendaForm(AgendaDateForm):
 class ContinuousReservationForm(forms.Form):
     doctor = forms.ModelChoiceField(label='Médico solicitante', queryset=Doctor.objects.filter(active=True))
     patient_name = forms.CharField(label='Nombre del paciente', max_length=180)
+    patient_rut = RutField()
     procedure = forms.ModelChoiceField(label='Tipo de cirugía', queryset=Procedure.objects.filter(active=True))
     desired_time = forms.TimeField(
         label='Inicio deseado (preparación de anestesia)', input_formats=['%H:%M'],
