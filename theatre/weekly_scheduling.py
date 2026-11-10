@@ -37,7 +37,7 @@ def available_starts(room, day, now=None, periods=None, policy=None):
     now = now or timezone.now()
     policy = policy or OperatingSettings.current()
     preparation = timedelta(minutes=policy.preparation_mean_minutes)
-    opening, closing = booking_window(day, policy)
+    opening, closing = booking_window(day, room)
     if not room.active:
         return []
     if periods is None:
@@ -73,7 +73,7 @@ def available_starts(room, day, now=None, periods=None, policy=None):
 def continuous_day(room, day, now=None, policy=None):
     now = now or timezone.now()
     policy = policy or OperatingSettings.current()
-    opening, closing = booking_window(day, policy)
+    opening, closing = booking_window(day, room)
     slots, periods = occupancy(day, now, room.pk, minimum_use=timedelta(0))
     start, end = slots[0]['start'], slots[-1]['end']
     total = (end - start).total_seconds()
@@ -188,7 +188,6 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
     planned = DateTimeField().clean(datetime.combine(day, desired_time)).astimezone(datetime_timezone.utc)
     policy = OperatingSettings.current()
     start, end = planned - timedelta(minutes=policy.preparation_mean_minutes), planned + timedelta(minutes=duration_minutes)
-    validate_booking_window(day, planned, end, policy)
     now = timezone.now()
     if start < now:
         raise ValidationError(f'El inicio de preparación ({policy.preparation_mean_minutes} minutos antes) no puede estar en el pasado.')
@@ -198,6 +197,7 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
     locked_room = Room.objects.select_for_update().filter(pk=room.pk, active=True).first()
     if locked_room is None:
         raise ValidationError('El pabellón no está disponible.')
+    validate_booking_window(day, planned, end, locked_room)
     if not Doctor.objects.filter(pk=doctor.pk, active=True).exists() or not Procedure.objects.filter(pk=procedure.pk, active=True).exists():
         raise ValidationError('Seleccione un médico y un tipo de cirugía activos.')
     cursor = timezone.localdate(start)

@@ -30,8 +30,6 @@ class OperatingSettings(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(1440)],
         help_text='Se activa una alarma visual cuando la preparación real en curso supera este tiempo.',
     )
-    opening_time = models.TimeField('Hora de apertura de reservas', default=time(7))
-    closing_time = models.TimeField('Hora de cierre de reservas', default=time(23))
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -41,19 +39,12 @@ class OperatingSettings(models.Model):
             models.CheckConstraint(condition=Q(pk=1), name='single_operating_settings'),
             models.CheckConstraint(condition=Q(preparation_mean_minutes__gte=1, preparation_mean_minutes__lte=1440), name='valid_preparation_mean'),
             models.CheckConstraint(condition=Q(preparation_max_minutes__gte=models.F('preparation_mean_minutes'), preparation_max_minutes__lte=1440), name='valid_preparation_max'),
-            models.CheckConstraint(condition=Q(closing_time__gt=models.F('opening_time')), name='valid_booking_hours'),
         ]
 
     def clean(self):
         super().clean()
         if self.preparation_max_minutes is not None and self.preparation_mean_minutes is not None and self.preparation_max_minutes < self.preparation_mean_minutes:
             raise ValidationError({'preparation_max_minutes': 'El máximo debe ser igual o mayor al tiempo medio.'})
-        if self.opening_time is not None and self.closing_time is not None and self.opening_time >= self.closing_time:
-            raise ValidationError({'closing_time': 'El cierre debe ser posterior a la apertura dentro del mismo día.'})
-        for field in ['opening_time', 'closing_time']:
-            value = getattr(self, field)
-            if value is not None and (value.second or value.microsecond):
-                raise ValidationError({field: 'Ingrese horas y minutos, sin segundos.'})
 
     @classmethod
     def current(cls):
@@ -64,9 +55,22 @@ class OperatingSettings(models.Model):
 
 
 class Room(Catalog):
+    opening_time = models.TimeField('Hora de apertura de reservas', default=time(7))
+    closing_time = models.TimeField('Hora de cierre de reservas', default=time(23))
+
     class Meta(Catalog.Meta):
         verbose_name = 'pabellón'
         verbose_name_plural = 'pabellones'
+        constraints = [models.CheckConstraint(condition=Q(closing_time__gt=models.F('opening_time')), name='valid_room_booking_hours')]
+
+    def clean(self):
+        super().clean()
+        if self.opening_time is not None and self.closing_time is not None and self.opening_time >= self.closing_time:
+            raise ValidationError({'closing_time': 'El cierre debe ser posterior a la apertura dentro del mismo día.'})
+        for field in ['opening_time', 'closing_time']:
+            value = getattr(self, field)
+            if value is not None and (value.second or value.microsecond):
+                raise ValidationError({field: 'Ingrese horas y minutos, sin segundos.'})
 
 
 class Procedure(Catalog):

@@ -16,7 +16,7 @@ La [agenda de reservas](docs/AGENDA.md), en `/agenda/`, permite consultar una fe
 
 La [agenda semanal continua](docs/AGENDA_SEMANAL.md), en `/agenda-semanal/`, muestra un único pabellón de lunes a domingo. Al elegir un día permite reservar por minutos, con inicio a la hora o media hora y 15 minutos previos de preparación del pabellón.
 
-En [Configuración de pabellones](docs/CONFIGURACION.md), Administración define los tiempos medio y máximo de preparación y el horario de reservas (07:00–23:00 por defecto). El tiempo medio reemplaza los 15 minutos iniciales en nuevas reservas; el máximo activa una alarma visual en preparaciones en curso.
+En [Configuración de pabellones](docs/CONFIGURACION.md), Administración define los tiempos medio y máximo de preparación. La apertura y el cierre de reservas se editan en cada pabellón (07:00–23:00 por defecto en nuevos registros). El tiempo medio reemplaza los 15 minutos iniciales en nuevas reservas; el máximo activa una alarma visual en preparaciones en curso.
 
 Consultar [la guía de instalación](docs/INSTALACION.md) para configurar la VM, HTTPS, usuarios y respaldos. La configuración real se mantiene fuera de GitHub.
 

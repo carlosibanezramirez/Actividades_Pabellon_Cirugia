@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from .models import OperatingSettings, Reservation
+from .models import Reservation
 
 from .scheduling import day_slots, reserve_hours
 from .tests import fixtures
@@ -68,7 +68,7 @@ class StartGapTests(TestCase):
         self.assertEqual(timezone.localtime(booking.planned_start_at).time(), time(15))
 
     def test_midnight_continuation_checks_previous_booking_ending_in_selected_day(self):
-        policy = OperatingSettings.current()
+        policy = self.item.room
         policy.opening_time = time(0)
         policy.closing_time = time(23, 59)
         policy.save()

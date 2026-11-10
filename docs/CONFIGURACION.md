@@ -1,13 +1,15 @@
 # Configuración de pabellones
 
-En **Administración → Configuración de pabellones**, un administrador puede editar una única configuración general para esta instalación. Los superusuarios tienen acceso; para el grupo Administrador, ejecutar `setup_roles` después de migrar para incorporar los permisos de consulta y modificación. Se mantiene el requisito de acceso al panel (`staff`).
+En **Administración → Configuración de pabellones**, un administrador puede editar los tiempos medio y máximo de preparación para esta instalación. La apertura y el cierre se editan individualmente en **Administración → Pabellones**, tanto al agregar como al modificar un pabellón. Los superusuarios tienen acceso; el grupo Administrador necesita los permisos asignados por `setup_roles` y acceso al panel (`staff`).
 
 | Parámetro | Valor inicial | Uso |
 | --- | --- | --- |
 | Tiempo medio de preparación | 15 minutos | Tiempo que se añade antes del inicio solicitado en las nuevas reservas continuas |
 | Tiempo máximo de preparación | 30 minutos | Umbral de alarma para la preparación real en curso |
-| Apertura de reservas | 07:00 | Primer inicio solicitado permitido |
-| Cierre de reservas | 23:00 | Hora máxima de término de la intervención reservada |
+| Apertura de reservas de cada pabellón | 07:00 en nuevos pabellones | Primer inicio solicitado permitido en ese pabellón |
+| Cierre de reservas de cada pabellón | 23:00 en nuevos pabellones | Hora máxima de término de la intervención reservada en ese pabellón |
+
+Al actualizar, los pabellones existentes reciben el horario global vigente antes de la migración. Si era 06:00–23:00, conservan ese horario como punto de partida. Después cada pabellón puede tener horas distintas; modificar uno no afecta a los demás. Los campos horarios ya no aparecen en la configuración general de preparación.
 
 Los tiempos son enteros positivos de hasta 1440 minutos. El máximo debe ser igual o mayor al medio. Apertura y cierre usan horas y minutos, dentro del mismo día, y el cierre debe ser posterior a la apertura. El panel administrativo registra los cambios en su historial.
 
@@ -31,4 +33,6 @@ El cambio del máximo se refleja en las preparaciones en curso en la siguiente c
 
 ## Instalación
 
-Crear respaldo, reconstruir la imagen, detener web, aplicar `migrate`, ejecutar `setup_roles` y volver a iniciar web. La migración crea la configuración inicial y flexibiliza la restricción de preparación para admitir los nuevos tiempos; conserva las reservas existentes.
+Crear respaldo, reconstruir la imagen, detener web, aplicar `migrate`, ejecutar `setup_roles` si se necesitan actualizar permisos y volver a iniciar web. Las migraciones conservan las reservas existentes y trasladan el horario global vigente a cada pabellón antes de retirar los campos globales.
+
+La reversión al esquema de horario global solo puede representar un horario: recupera el del primer pabellón y no conserva las diferencias individuales. Mantener un respaldo antes de revertir.
