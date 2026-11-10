@@ -27,9 +27,11 @@
     hide();
     active = block;
     popup.replaceChildren();
-    const rows = [['Etapa', block.dataset.phase], ['Horario del tramo', block.dataset.phaseHours],
+    const rows = [['Etapa', block.dataset.phase],
       ['Tipo de cirugía', block.dataset.surgery], ['Médico', block.dataset.doctor],
-      ['Horario reservado', block.dataset.hours], ['Paciente', block.dataset.patient], ['RUT', block.dataset.rut]];
+      ['Horario Tramo', block.dataset.phaseHours], ['Horario Reserva', block.dataset.hours],
+      ['Duración de la Reserva en minutos', block.dataset.duration],
+      ['Paciente', block.dataset.patient], ['RUT', block.dataset.rut]];
     rows.forEach(([label, value]) => {
       const row = document.createElement('p');
       const title = document.createElement('strong');
