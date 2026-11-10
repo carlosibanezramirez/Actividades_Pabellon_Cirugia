@@ -27,7 +27,8 @@
     hide();
     active = block;
     popup.replaceChildren();
-    const rows = [['Tipo de cirugía', block.dataset.surgery], ['Médico', block.dataset.doctor],
+    const rows = [['Etapa', block.dataset.phase], ['Horario del tramo', block.dataset.phaseHours],
+      ['Tipo de cirugía', block.dataset.surgery], ['Médico', block.dataset.doctor],
       ['Horario reservado', block.dataset.hours], ['Paciente', block.dataset.patient], ['RUT', block.dataset.rut]];
     rows.forEach(([label, value]) => {
       const row = document.createElement('p');

@@ -3,14 +3,18 @@
     <div class="time-ruler" aria-hidden="true">{% for tick in day.ticks %}<span style="top:{{ tick.position }}%;">{{ tick.label }}</span>{% endfor %}</div>
     {% if day_link %}<a class="timeline-day-link" href="{{ day_link }}" aria-label="Consultar y reservar el {{ day.date|date:'d/m/Y' }}"><span class="visually-hidden">Ver día y reservar</span></a>{% endif %}
     {% for block in day.booking_blocks %}
-    <button type="button" class="reservation-block {% if block.compact %}compact{% endif %}" style="top:{{ block.top }}%;height:{{ block.height }}%;" data-booking-tooltip
+    {% for part in block.parts %}
+    <button type="button" class="reservation-block {% if part.compact %}compact{% endif %} {% if part.preparation %}preparation-block{% endif %}" style="top:{{ part.top }}%;height:{{ part.height }}%;" data-booking-tooltip
+        data-phase="{% if part.preparation %}Preparación del pabellón (15 minutos previos){% else %}Intervención programada{% endif %}"
+        data-phase-hours="{{ part.start|date:'d/m H:i' }} – {{ part.end|date:'d/m H:i' }}"
         data-surgery="{{ block.booking.procedure }}" data-doctor="{{ block.booking.doctor }}"
         data-hours="{{ block.booking.starts_at|date:'d/m H:i' }} – {{ block.booking.ends_at|date:'d/m H:i' }}"
         data-patient="{{ block.booking.patient_name }}" data-rut="{{ block.booking.patient_rut|default:'No registrado' }}"
         aria-label="Reserva #{{ block.booking.pk }}: {{ block.booking.procedure }}, {{ block.booking.doctor }}, {{ block.booking.starts_at|date:'H:i' }} a {{ block.booking.ends_at|date:'H:i' }}. Ver datos del paciente.">
-        <span class="reservation-block-title">{{ block.booking.procedure }}</span>
+        {% if part.preparation %}<span class="reservation-block-title">Preparación del pabellón</span>{% else %}<span class="reservation-block-title">{{ block.booking.procedure }}</span>
         <span>{{ block.booking.doctor }}</span>
-        <span class="reservation-block-hours">{{ block.booking.starts_at|date:'H:i' }} – {{ block.booking.ends_at|date:'H:i' }}</span>
+        <span class="reservation-block-hours">{{ part.start|date:'H:i' }} – {{ part.end|date:'H:i' }}</span>{% endif %}
     </button>
+    {% endfor %}
     {% endfor %}
 </div>

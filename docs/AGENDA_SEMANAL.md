@@ -2,7 +2,7 @@
 
 Disponible desde **Agenda semanal** o `/agenda-semanal/`. Se elige un pabellón y una fecha; se muestran los siete días de la semana correspondiente, de lunes a domingo. Las flechas permiten cambiar de semana manteniendo el pabellón elegido.
 
-Cada día es una banda continua: verde donde hay disponibilidad y rojo en los intervalos reservados u ocupados. No se redondean los intervalos a bloques de una hora. Un pabellón desactivado aparece no disponible y no admite reservas. Las reservas creadas en la agenda horaria anterior también bloquean su intervalo exacto en esta vista.
+Cada día es una banda continua: verde donde hay disponibilidad, negro en los 15 minutos previos de preparación y rojo en la intervención reservada u ocupada. No se redondean los intervalos a bloques de una hora. Un pabellón desactivado aparece no disponible y no admite reservas. Las reservas creadas en la agenda horaria anterior también bloquean su intervalo exacto en esta vista.
 
 ## Reservar un día
 
@@ -21,11 +21,11 @@ Por ejemplo: inicio solicitado `09:30`, duración `90` minutos. El pabellón que
 
 El comienzo de los 15 minutos previos no puede estar en el pasado. Se rechaza cualquier intersección con una reserva o uso ya registrado del mismo pabellón, aunque el conflicto solo afecte la preparación. Intervalos contiguos que se tocan exactamente sin superponerse sí se permiten.
 
-La preparación puede comenzar el día anterior y la intervención puede terminar el siguiente; se comprueban y colorean todos los días afectados. Tras guardar se vuelve al día seleccionado con el tramo ocupado en rojo, un mensaje con el horario completo y la reserva en el listado.
+La preparación puede comenzar el día anterior y la intervención puede terminar el siguiente; se comprueban y colorean todos los días afectados. Tras guardar se vuelve al día seleccionado con la preparación en negro y la intervención en rojo, un mensaje con el horario completo y la reserva en el listado.
 
 Los horarios se guardan en UTC y se muestran en America/Santiago. En cambios de hora se usan duraciones reales; se rechazan horas de inicio inexistentes o ambiguas. La escala continua contempla días de 23 o 25 horas.
 
-Cada reserva muestra dentro de su tramo rojo el tipo de cirugía, el médico y el horario reservado completo (incluidos los 15 minutos previos). Las reservas contiguas conservan textos separados. Al pasar el mouse, enfocar con teclado o tocar el bloque se muestra un recuadro con esos datos más el nombre y RUT del paciente. Escape o un toque fuera cierran el recuadro. En tramos cortos o columnas estrechas el texto interior puede recortarse; el recuadro conserva el detalle completo sin agrandar artificialmente el intervalo horario.
+Cada reserva muestra dentro de su tramo rojo el tipo de cirugía, el médico y el horario de intervención. Los 15 minutos anteriores se dibujan como un tramo negro separado y siguen bloqueados para otras reservas. El recuadro muestra tanto el horario del tramo como el horario reservado completo, incluida la preparación. Las reservas contiguas conservan textos separados. Al pasar el mouse, enfocar con teclado o tocar el bloque se muestra un recuadro con esos datos más el nombre y RUT del paciente. Escape o un toque fuera cierran el recuadro. En tramos cortos o columnas estrechas el texto interior puede recortarse; el recuadro conserva el detalle completo sin agrandar artificialmente el intervalo horario.
 
 El RUT es obligatorio para las nuevas reservas en ambas agendas. Las reservas existentes sin RUT mantienen sus datos y muestran «No registrado»; la migración no les asigna un identificador ficticio. Estos detalles siguen protegidos por autenticación y permiso de acceso a las intervenciones.
 

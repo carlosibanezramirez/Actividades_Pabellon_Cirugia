@@ -62,11 +62,26 @@ def continuous_day(room, day, now=None):
     for booking in sorted(bookings.values(), key=lambda item: (item.starts_at, item.pk)):
         left, right = max(start, booking.starts_at), min(end, booking.ends_at)
         if left < right:
+            parts = []
+            if booking.planned_start_at:
+                prep_end = min(end, booking.planned_start_at)
+                if left < prep_end:
+                    parts.append({'start': left, 'end': prep_end, 'preparation': True})
+                procedure_start = max(start, booking.planned_start_at)
+            else:
+                procedure_start = left
+            if procedure_start < right:
+                parts.append({'start': procedure_start, 'end': right, 'preparation': False})
+            for part in parts:
+                part['top'] = f'{100 * (part["start"] - start).total_seconds() / total:.6f}'
+                part['height'] = f'{100 * (part["end"] - part["start"]).total_seconds() / total:.6f}'
+                part['compact'] = (part['end'] - part['start']).total_seconds() <= 90 * 60
             blocks.append({
                 'booking': booking,
                 'top': f'{100 * (left - start).total_seconds() / total:.6f}',
                 'height': f'{100 * (right - left).total_seconds() / total:.6f}',
                 'compact': (right - left).total_seconds() <= 90 * 60,
+                'parts': parts,
             })
     return {
         'date': day, 'weekday': WEEKDAYS[day.weekday()], 'segments': segments,

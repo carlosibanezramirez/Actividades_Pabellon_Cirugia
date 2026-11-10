@@ -10,6 +10,7 @@ header nav { justify-content: flex-end; }
 .continuous-legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
 .free-dot { background: #a7dbb6; border: 1px solid #2e8a48; }
 .occupied-dot { background: #b91c1c; }
+.preparation-dot { background: #171717; }
 .inactive-dot { background: #795037; }
 .week-scroll { overflow-x: auto; padding: 4px 4px 20px; }
 .week-grid { display: grid; grid-template-columns: repeat(7,minmax(125px,1fr)); gap: 12px; min-width: 960px; }
@@ -35,6 +36,7 @@ header nav { justify-content: flex-end; }
 .reservation-block-hours { font-variant-numeric: tabular-nums; }
 .daily-timeline .reservation-block { font-size: 10px; }
 .reservation-block.compact,.daily-timeline .reservation-block.compact { font-size: 8px; line-height: 1; gap: 0; padding: 0 2px; }
+.reservation-block.preparation-block { background: #171717; border: 0; padding: 0 2px; }
 .reservation-tooltip { position: fixed; z-index: 10000; width: max-content; max-width: min(340px,calc(100vw - 20px)); background: #17313b; color: white; border-radius: 9px; padding: 14px 16px; box-shadow: 0 6px 24px #0004; font: 13px/1.45 system-ui,sans-serif; pointer-events: none; overflow-wrap: anywhere; }
 .reservation-tooltip[hidden] { display: none; }
 .reservation-tooltip p { margin: 5px 0; }
