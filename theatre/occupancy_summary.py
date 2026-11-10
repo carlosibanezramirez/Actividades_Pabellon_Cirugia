@@ -1,9 +1,10 @@
 """Resumen de intervalos libres por pabellón, sin redondear a bloques horarios."""
 from datetime import timedelta
 
+from django.db.models import Max
 from django.utils import timezone
 
-from .models import Reservation, Room
+from .models import Event, Reservation, Room
 from .operating import booking_window
 from .scheduling import day_slots, occupancy
 from .weekly_scheduling import week_start
@@ -62,5 +63,28 @@ def active_reservations_for_day(room, day, now=None):
     slots = day_slots(day)
     bookings = Reservation.objects.filter(
         room=room, starts_at__lt=slots[-1]['end'], ends_at__gt=slots[0]['start'],
-    ).select_related('procedure', 'doctor', 'intervention').order_by('starts_at', 'pk')
-    return [booking for booking in bookings if reservation_is_active(booking, now)]
+    ).select_related('procedure', 'doctor', 'intervention').annotate(
+        last_stage=Max('intervention__events__stage'),
+    ).order_by('starts_at', 'pk')
+    active = [booking for booking in bookings if reservation_is_active(booking, now)]
+    for booking in active:
+        booking.intervention_status = reservation_intervention_status(booking)
+    return active
+
+
+def reservation_intervention_status(booking):
+    intervention = getattr(booking, 'intervention', None)
+    if intervention is None:
+        return 'Programada'
+    if intervention.completed_at or booking.last_stage == Event.Stage.PATIENT_EXIT:
+        return 'Finalizada'
+    return {
+        Event.Stage.ROOM_START: 'En preparación del pabellón',
+        Event.Stage.ROOM_END: 'Pabellón preparado',
+        Event.Stage.ANESTHESIA_PREP_START: 'En preparación de anestesia',
+        Event.Stage.ANESTHESIA_PREP_END: 'Anestesia preparada',
+        Event.Stage.ANESTHESIA_START: 'En anestesia',
+        Event.Stage.SURGERY_START: 'En cirugía',
+        Event.Stage.SURGERY_END: 'Cirugía terminada',
+        Event.Stage.ANESTHESIA_END: 'Pendiente de salida del paciente',
+    }.get(booking.last_stage, 'Pendiente de preparación')
