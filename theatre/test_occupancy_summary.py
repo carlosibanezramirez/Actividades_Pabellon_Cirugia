@@ -127,3 +127,44 @@ class WeeklyOccupancySummaryTests(TestCase):
         self.item.delete()
         self.room.delete()
         self.assertContains(self.client.get(reverse('weekly_summary')), 'No hay pabellones configurados.')
+
+    def test_day_list_matches_counter_and_shows_requested_details(self):
+        booking = self.booking(time(9, 15), time(11))
+        booking.planned_start_at = self.instant(time(9, 30))
+        booking.save()
+        response = self.client.get(reverse('day_reservations', args=[self.room.pk, self.monday.isoformat()]))
+        self.assertContains(response, self.item.procedure.name)
+        self.assertContains(response, self.item.doctor.name)
+        self.assertContains(response, booking.patient_name)
+        self.assertContains(response, '09:30')
+        self.assertContains(response, '11:00')
+        self.assertNotContains(response, '09:15')
+        self.assertEqual(len(response.context['bookings']),
+                         weekly_occupancy_summary(self.monday)[0]['days'][0]['active_count'])
+        self.item.reservation = booking
+        self.item.completed_at = timezone.now()
+        self.item.save()
+        response = self.client.get(reverse('day_reservations', args=[self.room.pk, self.monday.isoformat()]))
+        self.assertContains(response, 'No hay reservas activas')
+
+    def test_day_list_is_scoped_to_day_and_room_and_includes_overnight(self):
+        booking = self.booking(time(22), time(23), day=self.monday - timedelta(days=1))
+        booking.ends_at = self.instant(time(2))
+        booking.save()
+        url = reverse('day_reservations', args=[self.room.pk, self.monday.isoformat()])
+        self.assertEqual([b.pk for b in self.client.get(url).context['bookings']], [booking.pk])
+        other = Room.objects.create(name='Sin reservas')
+        self.assertContains(self.client.get(reverse('day_reservations', args=[other.pk, self.monday.isoformat()])),
+                            'No hay reservas activas')
+        self.assertContains(self.client.get(reverse('day_reservations', args=[self.room.pk, (self.monday + timedelta(days=1)).isoformat()])),
+                            'No hay reservas activas')
+
+    def test_day_list_requires_permissions_and_valid_date(self):
+        url = reverse('day_reservations', args=[self.room.pk, self.monday.isoformat()])
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)
+        outsider = get_user_model().objects.create_user(username='sin-permiso-listado')
+        self.client.force_login(outsider)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get(reverse('day_reservations', args=[self.room.pk, 'invalida'])).status_code, 404)
