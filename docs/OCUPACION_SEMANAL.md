@@ -1,6 +1,6 @@
 # Resumen de ocupación semanal
 
-En **Ocupación semanal** (`/ocupacion-semanal/`), elegir una fecha consulta su semana de lunes a domingo. La vista es una matriz: los días aparecen en columnas y los pabellones en filas. Cada celda contiene la tarjeta del pabellón para esa fecha; en pantallas pequeñas se puede desplazar la matriz horizontalmente.
+En **Ocupación semanal** (`/ocupacion-semanal/`), elegir una fecha consulta su semana de lunes a domingo. La vista es una matriz: los días aparecen en columnas y los pabellones en filas. Cada celda contiene la tarjeta del pabellón; la fecha aparece solo en la cabecera de la columna. En computador (desde 1024 píxeles de ancho), las siete columnas se ajustan al ancho de la vista sin desplazamiento horizontal. En pantallas pequeñas se puede desplazar la matriz horizontalmente.
 
 Cada tarjeta muestra la cantidad de reservas activas (pendientes o en curso, cuyo término no ha pasado), los tramos libres exactos, sus minutos y el total disponible. Solo se muestran tramos de al menos 75 minutos (1 hora y 15 minutos); los más cortos se excluyen también del total. Este filtro es exclusivo del resumen y no cambia las reglas de reserva. Una reserva que cruza medianoche se cuenta en cada día en que ocupa tiempo. No se muestran nombres ni RUT de pacientes.
 
