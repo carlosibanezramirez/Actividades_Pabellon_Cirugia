@@ -1,3 +1,4 @@
+from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group
@@ -94,3 +95,37 @@ class ReservationRequestForm(forms.Form):
                 for room_id in Room.objects.values_list('pk', flat=True)
                 for slot in slots
             ]
+
+
+class WeeklyAgendaForm(AgendaDateForm):
+    room = forms.ModelChoiceField(label='Pabellón', queryset=Room.objects.all())
+
+    def clean_fecha(self):
+        day = super().clean_fecha()
+        monday = day - timedelta(days=day.weekday())
+        if monday.year < 1900 or (monday + timedelta(days=6)).year > 9997:
+            raise forms.ValidationError('Seleccione una semana completa entre los años 1900 y 9997.')
+        return day
+
+
+class ContinuousReservationForm(forms.Form):
+    doctor = forms.ModelChoiceField(label='Médico solicitante', queryset=Doctor.objects.filter(active=True))
+    patient_name = forms.CharField(label='Nombre del paciente', max_length=180)
+    procedure = forms.ModelChoiceField(label='Tipo de cirugía', queryset=Procedure.objects.filter(active=True))
+    desired_time = forms.TimeField(
+        label='Inicio deseado (preparación de anestesia)', input_formats=['%H:%M'],
+        widget=forms.Select(choices=[('', 'Seleccione hora de inicio')] + [
+            (f'{hour:02d}:{minute:02d}', f'{hour:02d}:{minute:02d}')
+            for hour in range(24) for minute in [0, 30]
+        ]),
+    )
+    duration_minutes = forms.IntegerField(
+        label='Duración hasta la salida del paciente (minutos)', min_value=1, max_value=1440,
+        help_text='Incluye preparación de anestesia, anestesia, cirugía y salida. Máximo 24 horas.',
+    )
+
+    def clean_desired_time(self):
+        value = self.cleaned_data['desired_time']
+        if value.minute not in (0, 30) or value.second or value.microsecond:
+            raise forms.ValidationError('Seleccione un inicio a la hora o media hora.')
+        return value

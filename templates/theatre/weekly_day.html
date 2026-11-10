@@ -1,0 +1,12 @@
+{% extends 'base.html' %}{% load static %}
+{% block title %}{{ room.name }} · {{ day.date|date:'d/m/Y' }} · Surgeon{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'weekly-agenda.css' %}">{% endblock %}
+{% block content %}
+<a class="back" href="{% url 'weekly_agenda' %}?{{ week_query }}">← Volver a la semana</a>
+<div class="page-heading"><div><p class="eyebrow">RESERVA POR MINUTOS</p><h1>{{ room.name }}</h1><p>{{ day.weekday }} {{ day.date|date:'d/m/Y' }} · Horario de Chile</p></div></div>
+<div class="continuous-legend"><span><i class="free-dot" aria-hidden="true"></i>Libre</span><span><i class="occupied-dot" aria-hidden="true"></i>Reservado / ocupado</span></div>
+<div class="daily-layout"><section class="card daily-timeline"><h2>Disponibilidad del día</h2>{% if day.hours != 24 %}<p class="muted">Esta fecha tiene {{ day.hours }} horas por cambio de horario.</p>{% endif %}{% include 'theatre/_continuous_timeline.html' %}</section>
+<div><section class="card continuous-booking"><p class="eyebrow">SOLICITUD DEL MÉDICO</p><h2>Reservar pabellón</h2><p class="muted">La hora elegida corresponde al inicio de preparación de anestesia. La duración llega hasta la salida del paciente.</p><p class="preparation-note"><strong>Se añaden 15 minutos antes</strong> para preparar el pabellón. Ejemplo: inicio 09:30 y duración 90 minutos ocupan 09:15–11:00.</p>
+{% if can_book %}<form method="post" id="continuous-reservation-form">{% csrf_token %}{{ form.as_p }}<button type="submit">Reservar pabellón</button></form>{% else %}<p class="message">{% if not room.active %}Este pabellón está desactivado y no admite reservas.{% else %}Esta fecha es solo de consulta. Selecciona hoy o una fecha futura para reservar.{% endif %}</p>{% endif %}</section>
+<section class="day-bookings"><h2>Reservas del día</h2>{% for booking in day.bookings %}<article class="card"><h3>{{ booking.starts_at|date:'d/m H:i' }}–{{ booking.ends_at|date:'d/m H:i' }}</h3><p>{{ booking.doctor }} · {{ booking.procedure }}</p>{% if booking.planned_start_at %}<p class="muted">Inicio solicitado: {{ booking.planned_start_at|date:'H:i' }} · {{ booking.planned_duration_minutes }} minutos + 15 de preparación.</p>{% endif %}<a href="{% url 'reservation_detail' booking.pk %}">Ver reserva #{{ booking.pk }} →</a></article>{% empty %}<p class="muted">No hay reservas registradas para esta fecha.</p>{% endfor %}</section></div></div>
+{% endblock %}

@@ -32,7 +32,8 @@ def create_intervention(*, user, room, procedure, doctor, anesthetist, reservati
             raise ValidationError('La intervención debe iniciarse dentro del horario reservado.')
         if Intervention.objects.filter(reservation=reservation).exists():
             raise ValidationError('La reserva ya tiene una intervención asociada.')
-    bookings = Reservation.objects.filter(room=locked_room, starts_at__lt=now + HOUR, ends_at__gt=now)
+    expected_end = reservation.ends_at if reservation and reservation.planned_start_at else now + HOUR
+    bookings = Reservation.objects.filter(room=locked_room, starts_at__lt=expected_end, ends_at__gt=now)
     if reservation:
         bookings = bookings.exclude(pk=reservation.pk)
     if bookings.exists():

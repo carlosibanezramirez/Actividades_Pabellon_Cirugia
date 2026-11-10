@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% load static %}
+{% block title %}Agenda semanal · Surgeon{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'weekly-agenda.css' %}">{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">DISPONIBILIDAD CONTINUA</p><h1>Agenda semanal</h1><p class="muted">Un pabellón, siete días. Presiona un día para elegir el horario y reservar.</p></div></div>
+<form method="get" class="card weekly-filter"><div>{{ form.room.label_tag }}{{ form.room }}{{ form.room.errors }}</div><div>{{ form.fecha.label_tag }}{{ form.fecha }}{{ form.fecha.errors }}</div><button type="submit">Consultar semana</button>{{ form.non_field_errors }}</form>
+{% if days %}
+<div class="week-heading"><div><h2>{{ room.name }}</h2><p class="muted">Lunes {{ monday|date:'d/m/Y' }} a domingo {{ sunday|date:'d/m/Y' }} · Horario de Chile</p></div><nav aria-label="Cambiar semana"><a href="?{{ previous_query }}">← Semana anterior</a><a href="?{{ next_query }}">Semana siguiente →</a></nav></div>
+<div class="continuous-legend"><span><i class="free-dot" aria-hidden="true"></i>Libre</span><span><i class="occupied-dot" aria-hidden="true"></i>Reservado / ocupado</span>{% if not room.active %}<span><i class="inactive-dot" aria-hidden="true"></i>Pabellón no disponible</span>{% endif %}</div>
+<p class="muted">Los tramos rojos incluyen 15 minutos de preparación del pabellón antes del inicio solicitado. No hay bloques horarios predefinidos.</p>
+<div class="week-scroll"><div class="week-grid">{% for day in days %}<a class="week-day" href="{% url 'weekly_day' room.pk day.date|date:'Y-m-d' %}" aria-label="{{ day.weekday }} {{ day.date|date:'d/m/Y' }}: consultar y reservar"><div class="week-day-heading"><strong>{{ day.weekday }}</strong><span>{{ day.date|date:'d/m' }}</span><small>{{ day.free_minutes }} min libres{% if day.hours != 24 %} · día de {{ day.hours }} h{% endif %}</small></div>{% include 'theatre/_continuous_timeline.html' %}<span class="open-day">Ver día y reservar →</span></a>{% endfor %}</div></div>
+{% endif %}
+{% endblock %}

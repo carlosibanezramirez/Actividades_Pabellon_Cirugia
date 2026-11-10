@@ -57,6 +57,7 @@ class Reservation(models.Model):
     patient_name = models.CharField('Nombre del paciente', max_length=180)
     starts_at = models.DateTimeField('Inicio reservado', db_index=True)
     ends_at = models.DateTimeField('Término reservado', db_index=True)
+    planned_start_at = models.DateTimeField('Inicio solicitado (preparación de anestesia)', null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -65,9 +66,20 @@ class Reservation(models.Model):
         verbose_name = 'reserva'
         verbose_name_plural = 'reservas'
         constraints = [models.CheckConstraint(
-            condition=Q(ends_at__gte=models.F('starts_at') + timedelta(hours=1)),
-            name='reservation_minimum_one_hour',
+            condition=(
+                Q(planned_start_at__isnull=True, ends_at__gte=models.F('starts_at') + timedelta(hours=1))
+                | Q(planned_start_at__isnull=False,
+                    starts_at=models.F('planned_start_at') - timedelta(minutes=15),
+                    ends_at__gte=models.F('planned_start_at') + timedelta(minutes=1))
+            ),
+            name='reservation_valid_timing',
         )]
+
+    @property
+    def planned_duration_minutes(self):
+        if self.planned_start_at:
+            return int((self.ends_at - self.planned_start_at).total_seconds() // 60)
+        return None
 
     def __str__(self):
         return f'Reserva #{self.pk} · {self.room}'
