@@ -16,8 +16,8 @@
 <article class="card occupancy-day {% if not row.room.active %}unavailable{% elif day.intervals %}available{% else %}full{% endif %}">
 <div class="occupancy-day-heading"><h3>{{ row.room.name }}</h3><span class="reservation-count" title="Reservas pendientes o en curso, con término futuro">{{ day.active_count }} reserva{{ day.active_count|pluralize }} activa{{ day.active_count|pluralize }}</span></div>
 {% if not row.room.active %}<p>Pabellón no disponible.</p>{% elif day.past %}<p class="muted">Fecha pasada.</p>{% elif day.intervals %}
-<ul class="free-intervals">{% for interval in day.intervals %}<li><span>{{ interval.start|date:'H:i' }} – {{ interval.end|date:'H:i' }}</span><strong>{{ interval.minutes }} minutos disponibles</strong></li>{% endfor %}</ul>
-<div class="occupancy-day-footer"><span title="Tiempo libre para preparación e intervención. El inicio debe respetar las reglas de la agenda.">Total disponible: <strong>{{ day.free_minutes }} minutos</strong></span><a href="{% url 'weekly_day' row.room.pk day.date|date:'Y-m-d' %}">Ver día y reservar →</a></div>
+<ul class="free-intervals">{% for interval in day.intervals %}<li><span>{{ interval.start|date:'H:i' }} – {{ interval.end|date:'H:i' }}</span><strong>{{ interval.minutes }} mins. disp.</strong></li>{% endfor %}</ul>
+<div class="occupancy-day-footer"><a href="{% url 'weekly_day' row.room.pk day.date|date:'Y-m-d' %}">Ver día y reservar →</a></div>
 {% else %}<p class="muted">Sin tramos de al menos 75 minutos.</p>{% endif %}
 </article>
 </td>{% endfor %}</tr>{% endfor %}</tbody>

@@ -43,9 +43,9 @@ class WeeklyOccupancySummaryTests(TestCase):
                                                        (time(18, 50), time(21), 130)])
         response = self.client.get(reverse('weekly_summary'), {'fecha': self.monday.isoformat()})
         self.assertContains(response, '12:40 – 16:30')
-        self.assertContains(response, '230 minutos disponibles')
+        self.assertContains(response, '230 mins. disp.')
         self.assertContains(response, '18:50 – 21:00')
-        self.assertContains(response, '130 minutos disponibles')
+        self.assertContains(response, '130 mins. disp.')
         self.assertContains(response, '3 reservas activas')
         self.assertNotContains(response, 'Paciente ficticio resumen')
 
@@ -60,7 +60,7 @@ class WeeklyOccupancySummaryTests(TestCase):
         response = self.client.get(reverse('weekly_summary'), {'fecha': self.monday.isoformat()})
         self.assertNotContains(response, '12:00 – 13:14')
         self.assertContains(response, '15:00 – 16:15')
-        self.assertContains(response, '75 minutos disponibles')
+        self.assertContains(response, '75 mins. disp.')
         self.assertContains(response, '<th scope="col">', count=7)
 
     def test_room_hours_inactive_rooms_and_empty_days(self):
