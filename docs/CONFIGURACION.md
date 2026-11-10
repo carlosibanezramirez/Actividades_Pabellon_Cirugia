@@ -7,7 +7,7 @@ En **Administración → Configuración de pabellones**, un administrador puede 
 | Tiempo medio de preparación | 15 minutos | Tiempo que se añade antes del inicio solicitado en las nuevas reservas continuas |
 | Tiempo máximo de preparación | 30 minutos | Umbral de alarma para la preparación real en curso |
 | Apertura de reservas de cada pabellón | 07:00 en nuevos pabellones | Primer inicio solicitado permitido en ese pabellón |
-| Cierre de reservas de cada pabellón | 23:00 en nuevos pabellones | Hora máxima de término de la intervención reservada en ese pabellón |
+| Cierre de reservas de cada pabellón | 23:00 en nuevos pabellones | Última hora de inicio permitido, inclusive |
 
 Al actualizar, los pabellones existentes reciben el horario global vigente antes de la migración. Si era 06:00–23:00, conservan ese horario como punto de partida. Después cada pabellón puede tener horas distintas; modificar uno no afecta a los demás. Los campos horarios ya no aparecen en la configuración general de preparación.
 
@@ -17,7 +17,7 @@ Los tiempos son enteros positivos de hasta 1440 minutos. El máximo debe ser igu
 
 El tiempo medio es una estimación configurable de planificación, no el promedio calculado de los registros. Se agrega antes del inicio de preparación de anestesia solicitado por el médico. Si se configura a 20 minutos y se solicita 07:00 con una duración de 60 minutos, el pabellón se ocupa de **06:40 a 08:00**.
 
-La primera preparación puede comenzar antes de la apertura; el inicio solicitado debe respetar la apertura y la intervención completa debe terminar a más tardar al cierre. La agenda mantiene las 24 horas visibles y muestra en **celeste pálido** las franjas libres fuera del horario, sin enlaces de reserva. Una preparación reservada antes de la apertura aparece negra y ocupada. Las reservas antiguas y el uso real siguen visibles aunque queden fuera de un horario modificado posteriormente.
+La primera preparación puede comenzar antes de la apertura; el inicio solicitado debe estar entre la apertura y el cierre, ambos inclusive. La duración puede extenderse después del cierre y cruzar la medianoche: una reserva de 23:00 por 180 minutos termina a las 02:00 del día siguiente. Se comprueba la disponibilidad de todo el tramo, incluida la preparación, y la reserva se muestra ocupada en ambos días. La agenda mantiene las 24 horas visibles y muestra en **celeste pálido** las franjas libres fuera del horario, sin enlaces de reserva. Una preparación reservada antes de la apertura aparece negra y ocupada. Las reservas antiguas y el uso real siguen visibles aunque queden fuera de un horario modificado posteriormente.
 
 El cambio de tiempo medio afecta solo reservas nuevas. Las existentes mantienen sus fechas, duración y preparación almacenadas. Los formularios, sugerencias y validaciones del servidor utilizan la configuración vigente. La agenda horaria anterior también rechaza reservas fuera del período permitido.
 

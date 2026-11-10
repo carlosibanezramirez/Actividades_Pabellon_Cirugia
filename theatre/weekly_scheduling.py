@@ -57,7 +57,7 @@ def available_starts(room, day, now=None, periods=None, policy=None):
             except ValidationError:
                 continue
             start, end = planned - preparation, planned + timedelta(minutes=1)
-            if planned < opening or end > closing:
+            if planned < opening or planned > closing:
                 continue
             if start < now or any(p['start'] < end and p['end'] > start for p in all_periods):
                 continue
