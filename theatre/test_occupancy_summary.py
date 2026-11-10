@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Reservation, Room
+from .models import Event, Reservation, Room
 from .occupancy_summary import weekly_occupancy_summary
 from .tests import fixtures
 from .weekly_scheduling import week_start
@@ -168,3 +168,20 @@ class WeeklyOccupancySummaryTests(TestCase):
         self.assertEqual(self.client.get(url).status_code, 403)
         self.client.force_login(self.user)
         self.assertEqual(self.client.get(reverse('day_reservations', args=[self.room.pk, 'invalida'])).status_code, 404)
+
+    def test_day_list_shows_status_from_recorded_events(self):
+        booking = self.booking(time(9), time(11))
+        url = reverse('day_reservations', args=[self.room.pk, self.monday.isoformat()])
+        self.assertContains(self.client.get(url), '<td>Programada</td>')
+        self.item.reservation = booking
+        self.item.save()
+        self.assertContains(self.client.get(url), '<td>Pendiente de preparación</td>')
+        labels = ['En preparación del pabellón', 'Pabellón preparado', 'En preparación de anestesia',
+                  'Anestesia preparada', 'En anestesia', 'En cirugía', 'Cirugía terminada',
+                  'Pendiente de salida del paciente']
+        for stage, label in enumerate(labels, start=1):
+            now = timezone.now()
+            Event.objects.create(intervention=self.item, stage=stage, occurred_at=now,
+                                 original_at=now, recorded_by=self.user)
+            with self.subTest(stage=stage):
+                self.assertContains(self.client.get(url), f'<td>{label}</td>')
