@@ -10,12 +10,13 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
 from django.utils import timezone
 from urllib.parse import urlencode
-from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm
+from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm, WeeklySummaryForm
 from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
 from .models import Event, Intervention, OperatingSettings, Reservation, Room
 from .weekly_scheduling import continuous_day, reserve_continuous, week_start
 from .scheduling import availability, reserve_hours
 from .services import correct_event, create_intervention, record_event
+from .occupancy_summary import weekly_occupancy_summary
 from .alarms import active_preparations, preparation_alarm
 
 
@@ -49,6 +50,24 @@ def weekly_agenda(request):
             'next_query': urlencode({'room': room.pk, 'fecha': (monday + timedelta(days=7)).isoformat()}),
         })
     return render(request, 'theatre/weekly_agenda.html', context)
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def weekly_summary(request):
+    from datetime import timedelta
+    form = WeeklySummaryForm(request.GET if request.GET else {'fecha': timezone.localdate().isoformat()})
+    context = {'form': form}
+    if form.is_valid():
+        monday = week_start(form.cleaned_data['fecha'])
+        context.update({
+            'rooms': weekly_occupancy_summary(monday),
+            'monday': monday, 'sunday': monday + timedelta(days=6),
+            'previous_query': urlencode({'fecha': (monday - timedelta(days=7)).isoformat()}),
+            'next_query': urlencode({'fecha': (monday + timedelta(days=7)).isoformat()}),
+        })
+    return render(request, 'theatre/weekly_summary.html', context)
 
 
 @login_required

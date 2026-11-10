@@ -108,8 +108,7 @@ class ReservationRequestForm(forms.Form):
             ]
 
 
-class WeeklyAgendaForm(AgendaDateForm):
-    room = forms.ModelChoiceField(label='Pabellón', queryset=Room.objects.all())
+class WeeklySummaryForm(AgendaDateForm):
 
     def clean_fecha(self):
         day = super().clean_fecha()
@@ -117,6 +116,10 @@ class WeeklyAgendaForm(AgendaDateForm):
         if monday.year < 1900 or (monday + timedelta(days=6)).year > 9997:
             raise forms.ValidationError('Seleccione una semana completa entre los años 1900 y 9997.')
         return day
+
+
+class WeeklyAgendaForm(WeeklySummaryForm):
+    room = forms.ModelChoiceField(label='Pabellón', queryset=Room.objects.all())
 
 
 class ContinuousReservationForm(forms.Form):
