@@ -26,6 +26,8 @@ Se registra pabellón, fecha y horas exactas, médico, cirugía, paciente, usuar
 
 El servidor rechaza selecciones separadas, de diferentes pabellones, duplicadas o ya ocupadas. Un bloqueo transaccional por pabellón serializa las solicitudes simultáneas de reserva y de inicio de intervención. Las reservas se crean por este flujo; el panel administrativo solo permite consultarlas para no omitir estas validaciones.
 
+Para mantener la continuidad, el comienzo de una nueva reserva horaria no puede quedar más de 30 minutos después del término de la reserva anterior de ese pabellón en el mismo día. La primera reserva del día puede elegir horario sin depender de días anteriores. La agenda semanal aplica el mismo límite al inicio solicitado por el médico y comprueba además sus 15 minutos previos de preparación.
+
 Los horarios se almacenan en UTC y se muestran en America/Santiago. Los días de cambio de hora pueden tener 23 o 25 bloques; la agenda muestra el desplazamiento UTC cuando corresponde, para distinguir horas repetidas. Cada bloque representa una hora real.
 
 ## Consultar e iniciar

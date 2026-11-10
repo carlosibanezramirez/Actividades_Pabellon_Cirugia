@@ -156,11 +156,11 @@ class WeeklySchedulingTests(TestCase):
         self.assertEqual(Reservation.objects.count(), 0)
         self.reserve()
         response = self.client.post(url, {**data, 'patient_name': 'Paciente ficticio', 'patient_rut': '12345678-5', 'desired_time': '09:30'})
-        self.assertContains(response, 'No hay espacio para el intervalo completo')
+        self.assertIn('desired_time', response.context['form'].errors)
         self.assertEqual(Reservation.objects.count(), 1)
 
     def test_linked_short_reservation_can_start_without_imposing_old_hour_minimum(self):
-        booking = self.reserve(time(9), 20)  # 08:45–09:20
+        booking = self.reserve(time(9), 30)  # 08:45–09:30
         self.reserve(time(10), 20)  # 09:45–10:20
         Intervention.objects.filter(pk=self.intervention.pk).update(completed_at=timezone.now())
         with patch('theatre.services.timezone.now', return_value=booking.starts_at + timedelta(minutes=5)):

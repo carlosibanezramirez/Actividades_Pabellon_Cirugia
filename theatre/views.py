@@ -5,6 +5,7 @@ from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
 from django.utils import timezone
@@ -52,7 +53,11 @@ def weekly_day(request, room_id, day_string):
             raise ValueError
     except ValueError:
         raise Http404('Fecha no válida')
-    form = ContinuousReservationForm(request.POST or None)
+    day_data = continuous_day(room, day)
+    allowed = [option['value'] for option in day_data['start_options']]
+    suggested = request.GET.get('inicio', '')
+    initial = {'desired_time': suggested} if suggested in allowed else {}
+    form = ContinuousReservationForm(request.POST or None, initial=initial, allowed_times=allowed)
     if request.method == 'POST' and form.is_valid():
         try:
             booking = reserve_continuous(user=request.user, room=room, day=day, **form.cleaned_data)
@@ -64,7 +69,11 @@ def weekly_day(request, room_id, day_string):
             messages.success(request, f'Reserva #{booking.pk} confirmada: {start}–{end}, incluidos los 15 minutos de preparación.')
             return redirect('weekly_day', room_id=room.pk, day_string=day.isoformat())
     return render(request, 'theatre/weekly_day.html', {
-        'room': room, 'day': continuous_day(room, day), 'form': form,
+        'room': room, 'day': day_data, 'form': form,
+        'day_link': reverse('weekly_day', args=[room.pk, day.isoformat()]),
+        'has_starts': bool(allowed),
+        'no_start_for_gap': request.GET.get('sin_inicio') == '1',
+        'suggestion_expired': bool(suggested and suggested not in allowed),
         'week_query': urlencode({'room': room.pk, 'fecha': day.isoformat()}),
         'can_book': room.active and day >= timezone.localdate(),
     })
