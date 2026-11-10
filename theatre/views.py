@@ -17,7 +17,7 @@ from .models import Event, Intervention, OperatingSettings, Reservation, Room
 from .weekly_scheduling import continuous_day, reserve_continuous, week_start, reschedule_reservation, reservation_revision
 from .scheduling import availability, reserve_hours
 from .services import correct_event, create_intervention, record_event
-from .occupancy_summary import weekly_occupancy_summary
+from .occupancy_summary import weekly_occupancy_summary, active_reservations_for_day
 from .alarms import active_preparations, preparation_alarm
 
 
@@ -69,6 +69,23 @@ def weekly_summary(request):
             'next_query': urlencode({'fecha': (monday + timedelta(days=7)).isoformat()}),
         })
     return render(request, 'theatre/weekly_summary.html', context)
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def day_reservations(request, room_id, day_string):
+    from datetime import date
+    room = get_object_or_404(Room, pk=room_id)
+    try:
+        day = date.fromisoformat(day_string)
+        if not 1900 <= day.year <= 9997:
+            raise ValueError
+    except ValueError:
+        raise Http404('Fecha no válida')
+    return render(request, 'theatre/_day_reservations.html', {
+        'room': room, 'day': day, 'bookings': active_reservations_for_day(room, day),
+    })
 
 
 @login_required

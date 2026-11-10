@@ -1,0 +1,7 @@
+<p><strong>{{ room.name }}</strong> · {{ day|date:'d/m/Y' }}</p>
+{% if bookings %}
+<div class="day-reservations-table-scroll"><table class="day-reservations-table">
+<thead><tr><th scope="col">Intervención</th><th scope="col">Cirujano</th><th scope="col">Paciente</th><th scope="col">Inicio programado</th><th scope="col">Término programado</th></tr></thead>
+<tbody>{% for booking in bookings %}<tr><td>{{ booking.procedure }}</td><td>{{ booking.doctor }}</td><td>{{ booking.patient_name }}</td><td>{% if booking.planned_start_at %}{{ booking.planned_start_at|date:'d/m/Y H:i' }}{% else %}{{ booking.starts_at|date:'d/m/Y H:i' }}{% endif %}</td><td>{{ booking.ends_at|date:'d/m/Y H:i' }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<p>No hay reservas activas para este día y pabellón.</p>{% endif %}

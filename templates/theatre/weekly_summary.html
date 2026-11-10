@@ -14,7 +14,7 @@
 <tbody>{% for row in rooms %}<tr>
 {% for day in row.days %}<td>
 <article class="card occupancy-day {% if not row.room.active %}unavailable{% elif day.intervals %}available{% else %}full{% endif %}">
-<div class="occupancy-day-heading"><h3 title="{{ row.room.name }}">{{ row.room.name }}</h3><span class="reservation-count" title="Reservas pendientes o en curso, con término futuro">{{ day.active_count }} rsvs</span></div>
+<div class="occupancy-day-heading"><h3 title="{{ row.room.name }}">{{ row.room.name }}</h3><button type="button" class="reservation-count" data-day-reservations-url="{% url 'day_reservations' row.room.pk day.date|date:'Y-m-d' %}" aria-haspopup="dialog" aria-label="Ver {{ day.active_count }} reservas activas de {{ row.room.name }} del {{ day.date|date:'d/m/Y' }}" title="Ver reservas activas">{{ day.active_count }} rsvs</button></div>
 {% if not row.room.active %}<p>Pabellón no disponible.</p>{% elif day.past %}<p class="muted">Fecha pasada.</p>{% elif day.intervals %}
 <ul class="free-intervals">{% for interval in day.intervals %}<li><a class="free-interval-link" href="{% url 'weekly_day' row.room.pk day.date|date:'Y-m-d' %}#continuous-reservation-form" aria-label="Reservar en {{ row.room.name }}, {{ day.date|date:'d/m/Y' }}, tramo {{ interval.start|date:'H:i' }} a {{ interval.end|date:'H:i' }}"><span>{{ interval.start|date:'H:i' }} – {{ interval.end|date:'H:i' }}</span><strong>{{ interval.minutes }} mins. disp.</strong></a></li>{% endfor %}</ul>
 <div class="occupancy-day-footer"><a href="{% url 'weekly_day' row.room.pk day.date|date:'Y-m-d' %}">Ver día y reservar →</a></div>
@@ -24,4 +24,9 @@
 </table></div>
 {% else %}<p class="card">No hay pabellones configurados.</p>{% endif %}
 {% endif %}
+<dialog id="day-reservations-dialog" aria-labelledby="day-reservations-title">
+<div class="day-reservations-heading"><h2 id="day-reservations-title">Reservas del día</h2><button type="button" class="secondary" data-close-day-reservations>Cerrar</button></div>
+<div data-day-reservations-content aria-live="polite"></div>
+</dialog>
+<script src="{% static 'day-reservations.js' %}" defer></script>
 {% endblock %}

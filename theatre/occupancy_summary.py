@@ -3,9 +3,9 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from .models import Room
+from .models import Reservation, Room
 from .operating import booking_window
-from .scheduling import occupancy
+from .scheduling import day_slots, occupancy
 from .weekly_scheduling import week_start
 
 
@@ -26,11 +26,7 @@ def weekly_occupancy_summary(day, now=None):
             room = row['room']
             room_periods = by_room.get(room.pk, [])
             reservations = {p['reservation'].pk: p['reservation'] for p in room_periods if p['reservation']}
-            active_count = sum(
-                booking.ends_at > now and
-                (getattr(booking, 'intervention', None) is None or booking.intervention.completed_at is None)
-                for booking in reservations.values()
-            )
+            active_count = sum(reservation_is_active(booking, now) for booking in reservations.values())
             opening, closing = booking_window(date, room)
             cursor = max(opening, now)
             intervals = sorted((max(cursor, p['start']), min(closing, p['end']))
@@ -53,3 +49,18 @@ def weekly_occupancy_summary(day, now=None):
                 'past': date < timezone.localdate(now),
             })
     return rooms
+
+
+def reservation_is_active(booking, now):
+    return booking.ends_at > now and (
+        getattr(booking, 'intervention', None) is None or booking.intervention.completed_at is None
+    )
+
+
+def active_reservations_for_day(room, day, now=None):
+    now = now or timezone.now()
+    slots = day_slots(day)
+    bookings = Reservation.objects.filter(
+        room=room, starts_at__lt=slots[-1]['end'], ends_at__gt=slots[0]['start'],
+    ).select_related('procedure', 'doctor', 'intervention').order_by('starts_at', 'pk')
+    return [booking for booking in bookings if reservation_is_active(booking, now)]
