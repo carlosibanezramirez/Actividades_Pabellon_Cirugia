@@ -52,7 +52,7 @@ def continuous_day(room, day, now=None):
             segment['label'] = 'Pabellón no disponible'
     ticks = [{'position': '0', 'label': timezone.localtime(start).strftime('%H:%M')}]
     tz = timezone.get_current_timezone()
-    for hour in [6, 12, 18]:
+    for hour in range(3, 24, 3):
         tick = timezone.make_aware(datetime.combine(day, datetime.min.time().replace(hour=hour)), tz).astimezone(datetime_timezone.utc)
         ticks.append({'position': f'{100 * (tick - start).total_seconds() / total:.6f}', 'label': f'{hour:02d}:00'})
     ticks.append({'position': '100', 'label': '24:00'})
