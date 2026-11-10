@@ -1,0 +1,6 @@
+{% load static %}
+<dialog id="reservation-edit-dialog" aria-labelledby="reservation-edit-title">
+<div class="reservation-edit-heading"><h2 id="reservation-edit-title">Editar reserva</h2><button type="button" class="secondary" data-close-reservation-edit aria-label="Cerrar edición">Cerrar</button></div>
+<div data-reservation-edit-content aria-live="polite"></div>
+</dialog>
+<script src="{% static 'reservation-edit.js' %}" defer></script>
