@@ -2,6 +2,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('abrir-reserva/', views.open_reservations, name='open_reservations'),
+    path('reservas/<int:pk>/abrir/', views.open_reservation, name='open_reservation'),
     path('buscar-pabellon/', views.reservation_search, name='reservation_search'),
     path('pabellones/estado-preparacion/', views.preparation_status, name='preparation_status'),
     path('ocupacion-semanal/<int:room_id>/dia/<str:day_string>/reservas/', views.day_reservations, name='day_reservations'),

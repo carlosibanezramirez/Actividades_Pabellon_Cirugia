@@ -12,7 +12,7 @@ from django.views.decorators.cache import never_cache
 from django.utils import timezone
 from urllib.parse import urlencode
 from secrets import choice as choose_available_room
-from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm, WeeklySummaryForm, RescheduleReservationForm, CancelReservationForm, ReservationSearchForm
+from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm, WeeklySummaryForm, RescheduleReservationForm, CancelReservationForm, ReservationSearchForm, OpenReservationFilterForm, StartReservedInterventionForm
 from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
 from .models import Event, Intervention, OperatingSettings, Reservation, Room, PreoperativeActivity
 from .weekly_scheduling import continuous_day, reserve_continuous, week_start, reschedule_reservation, reservation_revision, cancel_reservation, find_available_rooms
@@ -21,6 +21,62 @@ from .services import correct_event, create_intervention, record_event, complete
 from .occupancy_summary import weekly_occupancy_summary, active_reservations_for_day
 from .room_access import can_reserve_room
 from .alarms import active_preparations, preparation_alarm
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def open_reservations(request):
+    from django.db.models import Q
+    from .scheduling import day_slots
+    form = OpenReservationFilterForm(request.GET if request.GET else {'fecha': timezone.localdate()})
+    rows = []
+    if form.is_valid():
+        slots = day_slots(form.cleaned_data['fecha'])
+        bookings = Reservation.objects.filter(cancelled_at__isnull=True,
+            starts_at__lt=slots[-1]['end'], ends_at__gt=slots[0]['start'],
+        ).select_related('room', 'doctor', 'procedure', 'intervention').order_by('starts_at', 'pk')
+        if form.cleaned_data['room']:
+            bookings = bookings.filter(room=form.cleaned_data['room'])
+        search = form.cleaned_data['search'].strip()
+        if search:
+            bookings = bookings.filter(Q(patient_name__icontains=search) | Q(doctor__name__icontains=search)
+                                       | Q(patient_rut__icontains=search.replace('.', '').replace(' ', '').upper()))
+        now = timezone.now()
+        for booking in bookings:
+            intervention = getattr(booking, 'intervention', None)
+            status = ('Finalizada' if intervention.completed_at else 'Intervención iniciada') if intervention else (
+                'Disponible para iniciar' if booking.starts_at <= now < booking.ends_at else
+                'Programada' if now < booking.starts_at else 'Horario finalizado')
+            rows.append({'booking': booking, 'intervention': intervention, 'status': status})
+    return render(request, 'theatre/open_reservations.html', {'form': form, 'rows': rows})
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def open_reservation(request, pk):
+    booking = get_object_or_404(Reservation.objects.select_related('room', 'doctor', 'procedure', 'intervention'), pk=pk)
+    intervention = getattr(booking, 'intervention', None)
+    if intervention:
+        return redirect('detail', pk=intervention.pk)
+    form = StartReservedInterventionForm(request.POST if request.method == 'POST' else None)
+    if request.method == 'POST' and form.is_valid():
+        try:
+            intervention = create_intervention(user=request.user, room=booking.room, doctor=booking.doctor,
+                procedure=booking.procedure, anesthetist=form.cleaned_data['anesthetist'], reservation=booking)
+        except (ValidationError, IntegrityError) as error:
+            form.add_error(None, error if isinstance(error, ValidationError) else
+                           'La intervención ya fue iniciada o el pabellón está ocupado. Actualice la página.')
+        else:
+            messages.success(request, 'Intervención abierta. Ya puede registrar las actividades.')
+            return redirect(reverse('detail', args=[intervention.pk]) + '#pending-activities')
+    now = timezone.now()
+    return render(request, 'theatre/open_reservation.html', {
+        'booking': booking, 'form': form,
+        'can_start': not booking.cancelled_at and booking.starts_at <= now < booking.ends_at,
+        'future': booking.starts_at > now,
+    })
 
 
 @login_required

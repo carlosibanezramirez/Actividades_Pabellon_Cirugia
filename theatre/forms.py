@@ -199,3 +199,13 @@ class ReservationSearchForm(ContinuousReservationForm, AgendaDateForm):
         if day.year > 9997:
             raise forms.ValidationError('Seleccione una fecha hasta el año 9997.')
         return day
+
+
+class OpenReservationFilterForm(AgendaDateForm):
+    room = forms.ModelChoiceField(label='Pabellón', queryset=Room.objects.all(), required=False,
+                                 empty_label='Todos los pabellones')
+    search = forms.CharField(label='Paciente, RUT o médico', max_length=180, required=False)
+
+
+class StartReservedInterventionForm(forms.Form):
+    anesthetist = forms.ModelChoiceField(label='Anestesista', queryset=eligible_anesthetists())
