@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 from django.db.models import Q
 from .forms import ProfileUserChangeForm, ProfileUserCreationForm
-from .models import CancellationReason, Correction, Doctor, Event, Intervention, OperatingSettings, Procedure, Reservation, Room, Specialty
+from .models import CancellationReason, Correction, Doctor, Event, Intervention, OperatingSettings, Procedure, Reservation, Room, Specialty, PreoperativeActivity
 
 
 @admin.register(OperatingSettings)
@@ -88,6 +88,12 @@ class ReadOnlyAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(PreoperativeActivity)
+class PreoperativeActivityAdmin(ReadOnlyAdmin):
+    list_display = ['intervention', 'kind', 'completed_at', 'completed_by']
+    list_filter = ['kind']
 
 
 @admin.register(Intervention)
