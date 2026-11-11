@@ -9,3 +9,7 @@ La opción **Nueva reserva** del menú abre `/buscar-pabellon/`. Solicita doctor
 Las asignaciones pendientes duran 15 minutos y quedan asociadas a la sesión autenticada, sin datos clínicos en la URL. Los campos manipulados en el envío no cambian el pabellón asignado en el servidor. El diagnóstico aparece en el detalle y se conserva al reprogramar o cancelar.
 
 Requiere el permiso de operación habitual. La migración 0014 de la versión anterior añade el diagnóstico; este ajuste de asignación automática no añade migraciones.
+
+## Horas disponibles al reservar para hoy
+
+El selector de Nueva reserva muestra inicios a las horas y medias horas que permitan completar la preparación previa desde la hora actual del servidor. Con preparación de 15 minutos, a las 10:10 el primer inicio es 10:30; a las 10:20 es 11:00. Al cambiar la fecha se actualiza la lista y, mientras el formulario está abierto, se refresca cada minuto. Los días futuros conservan sus horas válidas; se omiten horas ambiguas/inexistentes por cambio horario. Los horarios de cada pabellón se verifican al buscar, como antes. No requiere migraciones.

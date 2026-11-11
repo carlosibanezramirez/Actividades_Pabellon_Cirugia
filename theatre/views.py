@@ -26,6 +26,17 @@ from .alarms import active_preparations, preparation_alarm
 @login_required
 @permission_required('theatre.operate_intervention', raise_exception=True)
 @never_cache
+def reservation_start_times(request):
+    from .start_times import start_times_for_day
+    form = AgendaDateForm(request.GET)
+    if not form.is_valid():
+        return JsonResponse({'error': 'Seleccione una fecha válida.'}, status=400)
+    return JsonResponse({'times': start_times_for_day(form.cleaned_data['fecha'])})
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
 def open_reservations(request):
     from django.db.models import Q
     from .scheduling import day_slots
