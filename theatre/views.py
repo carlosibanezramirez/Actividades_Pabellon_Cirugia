@@ -14,10 +14,10 @@ from urllib.parse import urlencode
 from secrets import choice as choose_available_room
 from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm, WeeklySummaryForm, RescheduleReservationForm, CancelReservationForm, ReservationSearchForm
 from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
-from .models import Event, Intervention, OperatingSettings, Reservation, Room
+from .models import Event, Intervention, OperatingSettings, Reservation, Room, PreoperativeActivity
 from .weekly_scheduling import continuous_day, reserve_continuous, week_start, reschedule_reservation, reservation_revision, cancel_reservation, find_available_rooms
 from .scheduling import availability, reserve_hours
-from .services import correct_event, create_intervention, record_event
+from .services import correct_event, create_intervention, record_event, complete_preoperative_activity
 from .occupancy_summary import weekly_occupancy_summary, active_reservations_for_day
 from .room_access import can_reserve_room
 from .alarms import active_preparations, preparation_alarm
@@ -393,12 +393,19 @@ def detail(request, pk):
     intervention = get_object_or_404(Intervention.objects.select_related('room', 'procedure', 'doctor', 'anesthetist', 'created_by', 'reservation'), pk=pk)
     events = list(intervention.events.select_related('recorded_by').prefetch_related('corrections__corrected_by'))
     by_stage = {e.stage: e for e in events}
+    preoperative = {activity.kind: activity for activity in intervention.preoperative_activities.select_related('completed_by')}
+    consents_complete = len(preoperative) == 2
+    preoperative_rows = [{'kind': kind, 'label': label, 'activity': preoperative.get(kind),
+                         'enabled': kind not in preoperative and not intervention.completed_at
+                                    and not any(event.stage >= 3 for event in events)}
+                        for kind, label in PreoperativeActivity.Kind.choices]
     rows = []
     previous = None
     for stage, label in Event.Stage.choices:
         event = by_stage.get(stage)
         elapsed = str(event.occurred_at - previous.occurred_at).split('.')[0] if event and previous else None
-        rows.append({'stage': stage, 'label': label, 'event': event, 'enabled': stage == len(events) + 1 and not intervention.completed_at, 'elapsed': elapsed})
+        rows.append({'stage': stage, 'label': label, 'event': event, 'enabled': stage == len(events) + 1 and not intervention.completed_at and (stage != 3 or consents_complete),
+                     'blocked_consent': stage == 3 and len(events) == 2 and not consents_complete, 'elapsed': elapsed})
         if event:
             previous = event
     total = str(events[-1].occurred_at - events[0].occurred_at).split('.')[0] if len(events) == 9 else None
@@ -407,7 +414,8 @@ def detail(request, pk):
                               events[0].occurred_at if events else None,
                               events[-1].stage if events and not intervention.completed_at else None,
                               policy.preparation_max_minutes, timezone.now())
-    return render(request, 'theatre/detail.html', {'intervention': intervention, 'rows': rows, 'count': len(events), 'total': total, 'alarm': alarm})
+    return render(request, 'theatre/detail.html', {'intervention': intervention, 'rows': rows, 'count': len(events), 'total': total, 'alarm': alarm,
+        'preoperative_rows': preoperative_rows, 'consent_count': len(preoperative)})
 
 
 @login_required
@@ -422,6 +430,20 @@ def record(request, pk, stage):
         messages.error(request, text)
     else:
         messages.success(request, 'Evento registrado con la hora del servidor.')
+    return redirect('detail', pk=pk)
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@require_POST
+def complete_preoperative(request, pk, kind):
+    get_object_or_404(Intervention, pk=pk)
+    try:
+        complete_preoperative_activity(user=request.user, intervention_id=pk, kind=kind)
+    except (ValidationError, IntegrityError) as error:
+        messages.error(request, ' '.join(error.messages) if isinstance(error, ValidationError) else 'La actividad ya fue registrada.')
+    else:
+        messages.success(request, 'Actividad preoperatoria registrada con la fecha y hora del servidor.')
     return redirect('detail', pk=pk)
 
 

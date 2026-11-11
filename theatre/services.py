@@ -1,7 +1,7 @@
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
-from .models import Correction, Doctor, Event, Intervention, Procedure, Reservation, Room
+from .models import Correction, Doctor, Event, Intervention, Procedure, Reservation, Room, PreoperativeActivity
 
 
 def require_permission(user, permission):
@@ -50,7 +50,11 @@ def record_event(*, user, intervention_id, stage):
     events = list(intervention.events.order_by('stage'))
     if intervention.completed_at or stage != len(events) + 1 or not 1 <= stage <= 9:
         raise ValidationError('El evento ya se registró o no corresponde al siguiente paso. Actualice la página.')
+    if stage == Event.Stage.ANESTHESIA_PREP_START and intervention.preoperative_activities.count() < 2:
+        raise ValidationError('Complete ambos consentimientos informados antes de iniciar la preparación de anestesia.')
     now = timezone.now()
+    if stage == Event.Stage.ANESTHESIA_PREP_START and intervention.preoperative_activities.filter(completed_at__gt=now).exists():
+        raise ValidationError('La hora del servidor es anterior al registro de los consentimientos.')
     if events and now < events[-1].occurred_at:
         raise ValidationError('La hora del servidor es anterior al último evento. Solicite revisión al administrador.')
     event = Event.objects.create(intervention=intervention, stage=stage, occurred_at=now, original_at=now, recorded_by=user)
@@ -78,6 +82,8 @@ def correct_event(*, user, intervention_id, event_id, new_at, reason, expected_a
         raise ValidationError('La hora no puede ser anterior a la creación de la intervención.')
     if new_at == event.occurred_at:
         raise ValidationError('La nueva hora debe ser diferente de la actual.')
+    if event.stage == Event.Stage.ANESTHESIA_PREP_START and intervention.preoperative_activities.filter(completed_at__gt=new_at).exists():
+        raise ValidationError('La preparación de anestesia no puede ser anterior al registro de los consentimientos.')
     previous = intervention.events.filter(stage__lt=event.stage).order_by('-stage').first()
     following = intervention.events.filter(stage__gt=event.stage).order_by('stage').first()
     if (previous and new_at < previous.occurred_at) or (following and new_at > following.occurred_at):
@@ -89,3 +95,16 @@ def correct_event(*, user, intervention_id, event_id, new_at, reason, expected_a
         intervention.completed_at = new_at
         intervention.save(update_fields=['completed_at'])
     return event
+
+
+@transaction.atomic
+def complete_preoperative_activity(*, user, intervention_id, kind):
+    require_permission(user, 'theatre.operate_intervention')
+    intervention = Intervention.objects.select_for_update().get(pk=intervention_id)
+    if kind not in PreoperativeActivity.Kind.values:
+        raise ValidationError('La actividad preoperatoria no es válida.')
+    if intervention.completed_at or intervention.events.filter(stage__gte=Event.Stage.ANESTHESIA_PREP_START).exists():
+        raise ValidationError('Los consentimientos deben registrarse antes de iniciar la preparación de anestesia.')
+    if intervention.preoperative_activities.filter(kind=kind).exists():
+        raise ValidationError('Esta actividad ya fue registrada.')
+    return PreoperativeActivity.objects.create(intervention=intervention, kind=kind, completed_by=user)

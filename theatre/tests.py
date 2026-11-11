@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import Correction, Doctor, Event, Intervention, Procedure, Room, Specialty
-from .services import correct_event, create_intervention, record_event
+from .services import correct_event, create_intervention, record_event, complete_preoperative_activity
 from .forms import InterventionForm
 
 
@@ -39,6 +39,10 @@ class WorkflowTests(TestCase):
         self.client.force_login(self.user)
 
     def record(self, stage, at=None):
+        if stage == 3:
+            for kind in ['operation', 'anesthesia']:
+                if not self.intervention.preoperative_activities.filter(kind=kind).exists():
+                    complete_preoperative_activity(user=self.user, intervention_id=self.intervention.pk, kind=kind)
         if at:
             with patch('theatre.services.timezone.now', return_value=at):
                 return record_event(user=self.user, intervention_id=self.intervention.pk, stage=stage)

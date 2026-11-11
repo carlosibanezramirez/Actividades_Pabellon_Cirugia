@@ -188,6 +188,25 @@ class Intervention(models.Model):
         return f'Intervención #{self.pk} · {self.room}'
 
 
+class PreoperativeActivity(models.Model):
+    class Kind(models.TextChoices):
+        OPERATION_CONSENT = 'operation', 'Firma Consentimiento Informado Operación'
+        ANESTHESIA_CONSENT = 'anesthesia', 'Firma Consentimiento Informado Anestesia'
+
+    intervention = models.ForeignKey(Intervention, related_name='preoperative_activities', on_delete=models.PROTECT)
+    kind = models.CharField('Actividad', max_length=12, choices=Kind.choices)
+    completed_at = models.DateTimeField('Fecha y hora de ejecución', auto_now_add=True)
+    completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name='Registrada por', on_delete=models.PROTECT)
+
+    class Meta:
+        verbose_name = 'actividad preoperatoria'
+        verbose_name_plural = 'actividades preoperatorias'
+        constraints = [
+            models.UniqueConstraint(fields=['intervention', 'kind'], name='unique_preoperative_activity'),
+            models.CheckConstraint(condition=Q(kind__in=['operation', 'anesthesia']), name='valid_preoperative_activity'),
+        ]
+
+
 class Event(models.Model):
     class Stage(models.IntegerChoices):
         ROOM_START = 1, 'Inicio de preparación del pabellón'
