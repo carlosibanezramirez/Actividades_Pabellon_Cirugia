@@ -1,0 +1,5 @@
+.reservation-search-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 24px; align-items: start; }
+.search-room { margin-top: 14px; border-top: 4px solid #2e8a48; }
+.search-room h3 { margin: 0 0 12px; }
+.search-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+@media(max-width:740px) { .reservation-search-layout { grid-template-columns: 1fr; } }

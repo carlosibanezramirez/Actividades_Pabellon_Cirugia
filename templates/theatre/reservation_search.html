@@ -1,0 +1,20 @@
+{% extends 'base.html' %}{% load static %}
+{% block title %}Nueva reserva · Surgeon{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'weekly-agenda.css' %}"><link rel="stylesheet" href="{% static 'reservation-search.css' %}">{% endblock %}
+{% block content %}
+<h1>Nueva reserva de pabellón</h1>
+{% if confirmation %}
+<section class="card narrow"><h2>Confirmar reserva</h2>
+{{ form.non_field_errors }}
+<dl><dt>Pabellón</dt><dd>{{ selected_room.name }}</dd><dt>Cirujano</dt><dd>{{ form.cleaned_data.doctor }}</dd><dt>Paciente</dt><dd>{{ form.cleaned_data.patient_name }} · RUT: {{ form.cleaned_data.patient_rut }}</dd><dt>Diagnóstico</dt><dd>{{ form.cleaned_data.diagnosis }}</dd><dt>Operación</dt><dd>{{ form.cleaned_data.procedure }}</dd><dt>Inicio del procedimiento</dt><dd>{{ result.planned|date:'d/m/Y H:i' }}</dd><dt>Término programado</dt><dd>{{ result.end|date:'d/m/Y H:i' }}</dd><dt>Duración solicitada</dt><dd>{{ form.cleaned_data.duration_minutes }} minutos</dd><dt>Preparación del pabellón</dt><dd>{{ result.preparation_minutes }} minutos desde {{ result.start|date:'d/m/Y H:i' }}</dd></dl>
+<p>¿Confirma que desea registrar esta reserva?</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="confirm"><input type="hidden" name="token" value="{{ token }}"><div class="search-actions"><a class="button secondary" href="{% url 'reservation_search' %}">No, volver</a><button type="submit">Sí, confirmar y guardar</button></div></form>
+</section>
+{% else %}
+<div class="reservation-search-layout">
+<section class="card"><h2>Datos del procedimiento</h2><form method="post">{% csrf_token %}<input type="hidden" name="action" value="search">{{ form.as_p }}<button type="submit">Buscar pabellones disponibles</button></form></section>
+{% if searched %}<section><h2>Pabellones disponibles</h2><p>Inicio: {{ result.planned|date:'d/m/Y H:i' }} · Término: {{ result.end|date:'d/m/Y H:i' }}.</p><p class="muted">Incluye {{ result.preparation_minutes }} minutos previos de preparación desde {{ result.start|date:'d/m/Y H:i' }}.</p>
+{% for room in result.rooms %}<article class="card search-room"><h3>{{ room.name }}</h3><form method="post">{% csrf_token %}<input type="hidden" name="action" value="choose"><input type="hidden" name="token" value="{{ token }}"><input type="hidden" name="room" value="{{ room.pk }}"><button type="submit">Seleccionar y revisar</button></form></article>{% empty %}<p class="card">No hay pabellones disponibles para el día, hora y duración solicitados.</p>{% endfor %}</section>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

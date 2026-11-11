@@ -113,6 +113,7 @@ class Reservation(models.Model):
     procedure = models.ForeignKey(Procedure, verbose_name='Tipo de cirugía', on_delete=models.PROTECT)
     patient_name = models.CharField('Nombre del paciente', max_length=180)
     patient_rut = models.CharField('RUT del paciente', max_length=12, blank=True)
+    diagnosis = models.TextField('Diagnóstico', blank=True, default='')
     starts_at = models.DateTimeField('Inicio reservado', db_index=True)
     ends_at = models.DateTimeField('Término reservado', db_index=True)
     planned_start_at = models.DateTimeField('Inicio solicitado (preparación de anestesia)', null=True, blank=True)
