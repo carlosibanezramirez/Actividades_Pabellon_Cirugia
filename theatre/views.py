@@ -11,6 +11,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
 from django.utils import timezone
 from urllib.parse import urlencode
+from secrets import choice as choose_available_room
 from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm, WeeklySummaryForm, RescheduleReservationForm, CancelReservationForm, ReservationSearchForm
 from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
 from .models import Event, Intervention, OperatingSettings, Reservation, Room
@@ -28,6 +29,20 @@ def reservation_search(request):
     import secrets
     form = ReservationSearchForm(initial={'fecha': timezone.localdate()})
     context = {'form': form}
+    if request.method == 'GET' and request.GET.get('confirmada'):
+        try:
+            booking_id = int(request.GET['confirmada'])
+        except (ValueError, TypeError):
+            raise Http404('Reserva no válida')
+        booking = get_object_or_404(Reservation.objects.select_related('room', 'doctor', 'procedure'),
+                                    pk=booking_id, created_by=request.user)
+        context.update(saved=True, selected_room=booking.room, booking=booking,
+                       details={'doctor': booking.doctor, 'patient_name': booking.patient_name,
+                                'patient_rut': booking.patient_rut, 'diagnosis': booking.diagnosis,
+                                'procedure': booking.procedure, 'duration_minutes': booking.planned_duration_minutes},
+                       result={'planned': booking.planned_start_at, 'start': booking.starts_at,
+                               'end': booking.ends_at, 'preparation_minutes': booking.preparation_minutes})
+        return render(request, 'theatre/reservation_search.html', context)
     searches = request.session.get('reservation_searches', {})
     now = timezone.now().timestamp()
     searches = {key: value for key, value in searches.items() if value['expires'] > now}
@@ -48,28 +63,22 @@ def reservation_search(request):
                 result = find_available_rooms(day=data['fecha'], desired_time=data['desired_time'],
                                               duration_minutes=data['duration_minutes'])
                 if action == 'search':
-                    token = secrets.token_urlsafe(24)
-                    # Los datos clínicos quedan en la sesión del servidor, no en la URL.
-                    payload = {key: str(request.POST[key]) for key in form.fields}
-                    searches = dict(list(searches.items())[-4:])
-                    searches[token] = {'data': payload, 'expires': now + 900}
-                    context.update(result=result, token=token, searched=True)
-                elif action in ('choose', 'confirm'):
-                    token = request.POST['token']
-                    if action == 'choose':
-                        room_id = request.POST.get('room', '')
+                    if not result['rooms']:
+                        context.update(searched=True)
                     else:
-                        room_id = str(pending.get('room', ''))
-                    room = next((room for room in result['rooms'] if str(room.pk) == room_id), None)
-                    if room is None:
-                        context.update(result=result, token=token, searched=True)
-                        form.add_error(None, 'El pabellón seleccionado ya no está disponible. Elija otro resultado o repita la búsqueda.')
-                    elif action == 'choose':
+                        room = choose_available_room(result['rooms'])
                         token = secrets.token_urlsafe(24)
+                        payload = {key: str(request.POST[key]) for key in form.fields}
                         searches = dict(list(searches.items())[-4:])
-                        searches[token] = {'data': pending['data'], 'expires': now + 900, 'room': room.pk,
+                        searches[token] = {'data': payload, 'expires': now + 900, 'room': room.pk,
                                            'preparation_minutes': result['preparation_minutes']}
                         context.update(result=result, token=token, selected_room=room, confirmation=True)
+                elif action == 'confirm':
+                    token = request.POST['token']
+                    room = next((room for room in result['rooms'] if room.pk == pending.get('room')), None)
+                    if room is None:
+                        searches.pop(token, None)
+                        form.add_error(None, 'El pabellón asignado ya no está disponible. Busque nuevamente para obtener otra asignación.')
                     elif pending.get('preparation_minutes') != result['preparation_minutes']:
                         searches[token]['preparation_minutes'] = result['preparation_minutes']
                         context.update(result=result, token=token, selected_room=room, confirmation=True)
@@ -83,10 +92,13 @@ def reservation_search(request):
                         searches.pop(token, None)
                         request.session['reservation_searches'] = searches
                         messages.success(request, 'Reserva confirmada y registrada correctamente.')
-                        return redirect('reservation_detail', pk=booking.pk)
+                        return redirect(reverse('reservation_search') + '?' + urlencode({'confirmada': booking.pk}))
+                else:
+                    form.add_error(None, 'Acción no válida. Busque disponibilidad para asignar un pabellón.')
             except ValidationError as error:
                 form.add_error(None, error)
     request.session['reservation_searches'] = searches
+    context['details'] = form.cleaned_data if form.is_bound else {}
     return render(request, 'theatre/reservation_search.html', context)
 
 
