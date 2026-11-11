@@ -189,6 +189,18 @@ class ReservationSearchForm(ContinuousReservationForm, AgendaDateForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from .start_times import start_times_for_day
+        from django.urls import reverse
+        self.start_times = None
+        value = self['fecha'].value()
+        if value:
+            try:
+                day = forms.DateField().clean(value)
+                self.start_times = start_times_for_day(day)
+                self.fields['desired_time'].widget.choices = [('', 'Seleccione hora de inicio')] + [(clock, clock) for clock in self.start_times]
+            except forms.ValidationError:
+                pass
+        self.fields['desired_time'].widget.attrs['data-start-times-url'] = reverse('reservation_start_times')
         for key, label in {'doctor': 'Nombre del doctor', 'procedure': 'Operación',
                            'fecha': 'Día del procedimiento', 'desired_time': 'Hora de inicio',
                            'duration_minutes': 'Duración (minutos)'}.items():
@@ -199,6 +211,13 @@ class ReservationSearchForm(ContinuousReservationForm, AgendaDateForm):
         if day.year > 9997:
             raise forms.ValidationError('Seleccione una fecha hasta el año 9997.')
         return day
+
+    def clean(self):
+        data = super().clean()
+        clock = data.get('desired_time')
+        if clock and self.start_times is not None and clock.strftime('%H:%M') not in self.start_times:
+            self.add_error('desired_time', 'Seleccione una hora futura que permita la preparación previa del pabellón.')
+        return data
 
 
 class OpenReservationFilterForm(AgendaDateForm):
