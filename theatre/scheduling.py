@@ -39,7 +39,7 @@ def occupancy(day, now=None, room_id=None, minimum_use=HOUR):
     now = now or timezone.now()
     slots = day_slots(day)
     start, end = slots[0]['start'], slots[-1]['end']
-    reservations = Reservation.objects.filter(cancelled_at__isnull=True, starts_at__lt=end, ends_at__gt=start).select_related('doctor', 'procedure', 'room', 'created_by', 'intervention')
+    reservations = Reservation.objects.filter(cancelled_at__isnull=True, needs_rescheduling=False, starts_at__lt=end, ends_at__gt=start).select_related('doctor', 'procedure', 'room', 'created_by', 'intervention')
     uses = Intervention.objects.filter(room_engaged=True, created_at__lt=end).filter(
         Q(completed_at__isnull=True) | Q(completed_at__gt=start - minimum_use),
     ).select_related('doctor', 'procedure').prefetch_related(Prefetch(
@@ -50,9 +50,15 @@ def occupancy(day, now=None, room_id=None, minimum_use=HOUR):
         uses = uses.filter(room_id=room_id)
     periods = []
     for reservation in reservations:
-        periods.append({'room_id': reservation.room_id, 'start': reservation.starts_at,
-                        'end': reservation.ends_at, 'state': 'no_disponible',
-                        'label': 'Reservado', 'reservation': reservation, 'intervention': None})
+        base = {'room_id': reservation.room_id, 'label': 'Reservado', 'reservation': reservation, 'intervention': None}
+        boundary = reservation.overrun_from
+        if boundary and boundary < reservation.ends_at:
+            if reservation.starts_at < boundary:
+                periods.append({**base, 'start': reservation.starts_at, 'end': boundary, 'state': 'no_disponible'})
+            periods.append({**base, 'start': max(reservation.starts_at, boundary), 'end': reservation.ends_at,
+                            'state': 'overrun', 'label': 'Alargue con conflicto'})
+        else:
+            periods.append({**base, 'start': reservation.starts_at, 'end': reservation.ends_at, 'state': 'no_disponible'})
     for item in uses:
         events = {event.stage: event.occurred_at for event in item.events.all()}
         actual_start = events.get(1, item.created_at)
@@ -64,7 +70,7 @@ def occupancy(day, now=None, room_id=None, minimum_use=HOUR):
                 continue
             usage_end = end
         else:
-            usage_end = max(actual_end, actual_start + minimum_use)
+            usage_end = actual_end if item.reservation_id else max(actual_end, actual_start + minimum_use)
         if usage_end <= start or actual_start >= end:
             continue
         base = {'room_id': item.room_id, 'reservation': None, 'intervention': item}
@@ -85,7 +91,7 @@ def occupancy(day, now=None, room_id=None, minimum_use=HOUR):
 def availability(day, now=None, user=None):
     now = now or timezone.now()
     slots, periods = occupancy(day, now)
-    priority = {'no_disponible': 1, 'preparacion': 2, 'procedimiento': 3}
+    priority = {'overrun': 4, 'no_disponible': 1, 'preparacion': 2, 'procedimiento': 3}
     by_room = {}
     reservations = {}
     for period in periods:

@@ -24,7 +24,7 @@ def week_start(day):
 def validate_start_gap(room, day, planned, exclude_id=None):
     day_start = day_slots(day)[0]['start']
     previous = Reservation.objects.filter(
-        room=room, cancelled_at__isnull=True, ends_at__gt=day_start, ends_at__lte=planned,
+        room=room, cancelled_at__isnull=True, needs_rescheduling=False, ends_at__gt=day_start, ends_at__lte=planned,
     ).exclude(pk=exclude_id).order_by('-ends_at', '-pk').first()
     if previous and planned - previous.ends_at > MAX_START_GAP:
         ended = timezone.localtime(previous.ends_at).strftime('%H:%M')
@@ -150,6 +150,17 @@ def continuous_day(room, day, now=None, policy=None):
                 procedure_start = left
             if procedure_start < right:
                 parts.append({'start': procedure_start, 'end': right, 'preparation': False})
+            if booking.overrun_from and booking.ends_at > booking.overrun_from:
+                split = []
+                for part in parts:
+                    boundary = max(part['start'], booking.overrun_from)
+                    if boundary < part['end']:
+                        if part['start'] < boundary:
+                            split.append({**part, 'end': boundary})
+                        split.append({**part, 'start': boundary, 'overrun': True})
+                    else:
+                        split.append(part)
+                parts = split
             for part in parts:
                 part['top'] = f'{100 * (part["start"] - start).total_seconds() / total:.6f}'
                 part['height'] = f'{100 * (part["end"] - part["start"]).total_seconds() / total:.6f}'
@@ -170,6 +181,8 @@ def continuous_day(room, day, now=None, policy=None):
         'free_minutes': int(sum((s['end'] - s['start']).total_seconds() for s in segments if not s['busy'] and not s['closed']) // 60),
         'bookings': sorted(bookings.values(), key=lambda booking: (booking.starts_at, booking.pk)),
         'booking_blocks': blocks,
+        'displaced_bookings': Reservation.objects.filter(room=room, needs_rescheduling=True, cancelled_at__isnull=True,
+            original_starts_at__lt=end, original_ends_at__gt=start),
         'start_options': options,
         'policy': policy,
     }
@@ -233,7 +246,7 @@ def validate_reservation_space(room, day, planned, start, end, now, preparation_
 def reservation_revision(booking):
     return [booking.room_id, booking.starts_at.isoformat(), booking.ends_at.isoformat(),
             booking.planned_start_at.isoformat() if booking.planned_start_at else None,
-            booking.cancelled_at.isoformat() if booking.cancelled_at else None]
+            booking.cancelled_at.isoformat() if booking.cancelled_at else None, booking.needs_rescheduling]
 
 
 @transaction.atomic
@@ -255,16 +268,18 @@ def reschedule_reservation(*, user, reservation_id, room, day, desired_time, exp
         raise ValidationError('La reserva cambió mientras se editaba. Cierre el cuadro y vuelva a abrirla.')
     from .models import Intervention
     now = timezone.now()
-    if booking.cancelled_at or Intervention.objects.filter(reservation_id=booking.pk).exists() or booking.starts_at <= now:
+    if booking.cancelled_at or Intervention.objects.filter(reservation_id=booking.pk, room_engaged=True).exists() or (booking.starts_at <= now and not booking.needs_rescheduling):
         raise ValidationError('Solo se pueden reprogramar reservas futuras sin una intervención asociada.')
     destination = rooms.get(room.pk)
     if destination is None or not destination.active:
         raise ValidationError('El pabellón no está disponible.')
     require_room_booking_access(user, rooms[old_room_id])
     require_room_booking_access(user, destination)
-    old_planned = booking.planned_start_at or booking.starts_at
-    preparation = old_planned - booking.starts_at
-    duration = booking.ends_at - old_planned
+    restore = booking.timing_adjusted and booking.original_starts_at is not None
+    base_start = booking.original_starts_at if restore else booking.starts_at
+    base_planned = (booking.original_planned_start_at if restore else booking.planned_start_at) or base_start
+    preparation = base_planned - base_start
+    duration = (booking.original_ends_at if restore else booking.ends_at) - base_planned
     start, end = planned - preparation, planned + duration
     if start < now:
         raise ValidationError('El inicio de preparación no puede estar en el pasado.')
@@ -274,7 +289,11 @@ def reschedule_reservation(*, user, reservation_id, room, day, desired_time, exp
     booking.starts_at, booking.ends_at = start, end
     if booking.planned_start_at is not None:
         booking.planned_start_at = planned
-    booking.save(update_fields=['room', 'starts_at', 'ends_at', 'planned_start_at'])
+    booking.needs_rescheduling = False
+    booking.overrun_from = None
+    booking.timing_adjusted = False
+    booking.original_starts_at = booking.original_planned_start_at = booking.original_ends_at = None
+    booking.save()
     return booking
 
 

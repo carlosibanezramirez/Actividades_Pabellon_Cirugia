@@ -133,14 +133,22 @@ class Reservation(models.Model):
                                            on_delete=models.PROTECT, null=True, blank=True)
     cancellation_reason_name = models.CharField('Causa registrada', max_length=180, blank=True)
 
+    timing_adjusted = models.BooleanField('Horario ajustado por uso real', default=False)
+    needs_rescheduling = models.BooleanField('Pendiente de reprogramación', default=False)
+    overrun_from = models.DateTimeField('Inicio del alargue con conflicto', null=True, blank=True)
+    original_starts_at = models.DateTimeField('Inicio anterior al ajuste automático', null=True, blank=True)
+    original_planned_start_at = models.DateTimeField('Inicio solicitado anterior al ajuste', null=True, blank=True)
+    original_ends_at = models.DateTimeField('Término anterior al ajuste automático', null=True, blank=True)
+
     class Meta:
         ordering = ['starts_at', 'pk']
         verbose_name = 'reserva'
         verbose_name_plural = 'reservas'
         constraints = [models.CheckConstraint(
             condition=(
-                Q(planned_start_at__isnull=True, ends_at__gte=models.F('starts_at') + timedelta(hours=1))
-                | Q(planned_start_at__isnull=False,
+                Q(timing_adjusted=True, ends_at__gte=models.F('starts_at'))
+                | Q(timing_adjusted=False, planned_start_at__isnull=True, ends_at__gte=models.F('starts_at') + timedelta(hours=1))
+                | Q(timing_adjusted=False, planned_start_at__isnull=False,
                     starts_at__lte=models.F('planned_start_at') - timedelta(minutes=1),
                     ends_at__gte=models.F('planned_start_at') + timedelta(minutes=1))
             ),
@@ -187,6 +195,25 @@ class Intervention(models.Model):
 
     def __str__(self):
         return f'Intervención #{self.pk} · {self.room}'
+
+
+class ReservationAdjustment(models.Model):
+    reservation = models.ForeignKey(Reservation, related_name='adjustments', on_delete=models.PROTECT)
+    source_intervention = models.ForeignKey(Intervention, on_delete=models.PROTECT)
+    previous_start = models.DateTimeField()
+    previous_planned_start = models.DateTimeField(null=True)
+    previous_end = models.DateTimeField()
+    new_start = models.DateTimeField()
+    new_planned_start = models.DateTimeField(null=True)
+    new_end = models.DateTimeField()
+    reason = models.CharField(max_length=180)
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['recorded_at', 'pk']
+        verbose_name = 'ajuste de reserva por uso real'
+        verbose_name_plural = 'ajustes de reservas por uso real'
 
 
 class PreoperativeActivity(models.Model):
