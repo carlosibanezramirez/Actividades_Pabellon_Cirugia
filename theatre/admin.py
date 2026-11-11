@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 from django.db.models import Q
 from .forms import ProfileUserChangeForm, ProfileUserCreationForm
-from .models import CancellationReason, Correction, Doctor, Event, Intervention, OperatingSettings, Procedure, Reservation, Room, Specialty, PreoperativeActivity
+from .models import CancellationReason, Correction, Doctor, Event, Intervention, OperatingSettings, Procedure, Reservation, Room, Specialty, PreoperativeActivity, ReservationAdjustment
 
 
 @admin.register(OperatingSettings)
@@ -110,6 +110,11 @@ class EventAdmin(ReadOnlyAdmin):
 @admin.register(Correction)
 class CorrectionAdmin(ReadOnlyAdmin):
     list_display = ['event', 'previous_at', 'new_at', 'reason', 'corrected_by', 'corrected_at']
+
+
+@admin.register(ReservationAdjustment)
+class ReservationAdjustmentAdmin(ReadOnlyAdmin):
+    list_display = ['reservation', 'source_intervention', 'previous_start', 'previous_end', 'new_start', 'new_end', 'recorded_by']
 
 
 @admin.register(Reservation)

@@ -25,3 +25,5 @@
 @media(max-width:740px) { .booking-fields { grid-template-columns: 1fr; } .hour-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .agenda-date input { flex: 1; min-width: 0; } }
 
 .room-fuera_horario .hour-marquee { color: #284758; }
+
+.room-overrun { background: #795037; color: white; }

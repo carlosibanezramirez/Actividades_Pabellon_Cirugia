@@ -53,7 +53,7 @@ def weekly_occupancy_summary(day, now=None):
 
 
 def reservation_is_active(booking, now):
-    return booking.cancelled_at is None and booking.ends_at > now and (
+    return not booking.needs_rescheduling and booking.cancelled_at is None and booking.ends_at > now and (
         getattr(booking, 'intervention', None) is None or booking.intervention.completed_at is None
     )
 
@@ -62,7 +62,7 @@ def active_reservations_for_day(room, day, now=None):
     now = now or timezone.now()
     slots = day_slots(day)
     bookings = Reservation.objects.filter(
-        room=room, cancelled_at__isnull=True, starts_at__lt=slots[-1]['end'], ends_at__gt=slots[0]['start'],
+        room=room, cancelled_at__isnull=True, needs_rescheduling=False, starts_at__lt=slots[-1]['end'], ends_at__gt=slots[0]['start'],
     ).select_related('procedure', 'doctor', 'intervention').annotate(
         last_stage=Max('intervention__events__stage'),
     ).order_by('starts_at', 'pk')

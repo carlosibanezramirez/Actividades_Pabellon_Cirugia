@@ -1,3 +1,4 @@
+{% if booking.needs_rescheduling %}<p class="message error">Sin tiempo disponible por atraso previo. Seleccione una nueva fecha y hora para recuperar la duración originalmente solicitada.</p>{% elif booking.timing_adjusted %}<p class="message">Esta reserva fue ajustada por uso real del pabellón.</p>{% endif %}
 {% if not booking.cancelled_at %}
 <form method="post" action="{% url 'reservation_edit' booking.pk %}" data-reservation-edit-form>
 {% csrf_token %}

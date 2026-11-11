@@ -45,9 +45,12 @@ def open_reservations(request):
         now = timezone.now()
         for booking in bookings:
             intervention = getattr(booking, 'intervention', None)
-            status = ('Finalizada' if intervention.completed_at else 'Intervención iniciada' if intervention.room_engaged else 'Preoperatorio abierto') if intervention else (
-                'Disponible para iniciar' if booking.starts_at <= now < booking.ends_at else
-                'Programada' if now < booking.starts_at else 'Horario finalizado')
+            if booking.needs_rescheduling:
+                status = 'Pendiente de reprogramación'
+            elif intervention:
+                status = 'Finalizada' if intervention.completed_at else ('Intervención iniciada' if intervention.room_engaged else 'Preoperatorio abierto')
+            else:
+                status = 'Disponible para iniciar' if booking.starts_at <= now < booking.ends_at else ('Programada' if now < booking.starts_at else 'Horario finalizado')
             rows.append({'booking': booking, 'intervention': intervention, 'status': status})
     return render(request, 'theatre/open_reservations.html', {'form': form, 'rows': rows})
 
@@ -74,7 +77,7 @@ def open_reservation(request, pk):
     now = timezone.now()
     return render(request, 'theatre/open_reservation.html', {
         'booking': booking, 'form': form,
-        'can_start': not booking.cancelled_at and now < booking.ends_at,
+        'can_start': not booking.cancelled_at and not booking.needs_rescheduling and now < booking.ends_at,
         'future': booking.starts_at > now,
     })
 
@@ -309,7 +312,7 @@ def reservation_detail(request, pk):
     booking = get_object_or_404(Reservation.objects.select_related('room', 'doctor', 'procedure', 'created_by', 'intervention'), pk=pk)
     return render(request, 'theatre/reservation_detail.html', {
         'booking': booking,
-        'can_start': not booking.cancelled_at and not hasattr(booking, 'intervention') and timezone.now() < booking.ends_at,
+        'can_start': not booking.needs_rescheduling and not booking.cancelled_at and not hasattr(booking, 'intervention') and timezone.now() < booking.ends_at,
     })
 
 
@@ -457,7 +460,8 @@ def detail(request, pk, history=False):
                         for kind, label in PreoperativeActivity.Kind.choices]
     from datetime import timedelta
     earliest_preparation = intervention.reservation.starts_at - timedelta(minutes=30) if intervention.reservation_id else None
-    preparation_locked = bool(earliest_preparation and timezone.now() < earliest_preparation)
+    preparation_locked = bool(intervention.reservation_id and intervention.reservation.needs_rescheduling or
+                              earliest_preparation and timezone.now() < earliest_preparation)
     rows = []
     previous = None
     for stage, label in Event.Stage.choices:

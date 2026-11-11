@@ -27,6 +27,8 @@ def create_intervention(*, user, room, procedure, doctor, anesthetist, reservati
     now = timezone.now()
     if reservation:
         reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
+        if reservation.needs_rescheduling:
+            raise ValidationError('La reserva no tiene tiempo disponible y está pendiente de reprogramación.')
         if reservation.cancelled_at:
             raise ValidationError('La reserva está cancelada.')
         if (reservation.room_id != locked_room.pk or reservation.doctor_id != doctor.pk
@@ -59,6 +61,8 @@ def record_event(*, user, intervention_id, stage):
     now = timezone.now()
     if intervention.reservation_id:
         booking = intervention.reservation
+        if booking.needs_rescheduling:
+            raise ValidationError('La reserva está pendiente de reprogramación por atraso de otra intervención.')
         if booking.cancelled_at:
             raise ValidationError('La reserva está cancelada.')
         if stage in (Event.Stage.ROOM_START, Event.Stage.ROOM_END) and now < booking.starts_at - timedelta(minutes=30):
@@ -83,12 +87,16 @@ def record_event(*, user, intervention_id, stage):
     if stage == Event.Stage.PATIENT_EXIT:
         intervention.completed_at = now
         intervention.save(update_fields=['completed_at'])
+        from .reservation_adjustments import reconcile_patient_exit
+        reconcile_patient_exit(intervention, now, user)
     return event
 
 
 @transaction.atomic
 def correct_event(*, user, intervention_id, event_id, new_at, reason, expected_at):
     require_permission(user, 'theatre.correct_event')
+    room_id = Intervention.objects.values_list('room_id', flat=True).get(pk=intervention_id)
+    Room.objects.select_for_update().get(pk=room_id)
     intervention = Intervention.objects.select_for_update().get(pk=intervention_id)
     event = intervention.events.get(pk=event_id)
     if event.occurred_at != expected_at:
@@ -118,6 +126,8 @@ def correct_event(*, user, intervention_id, event_id, new_at, reason, expected_a
     if event.stage == Event.Stage.PATIENT_EXIT:
         intervention.completed_at = new_at
         intervention.save(update_fields=['completed_at'])
+        from .reservation_adjustments import reconcile_patient_exit
+        reconcile_patient_exit(intervention, new_at, user)
     return event
 
 

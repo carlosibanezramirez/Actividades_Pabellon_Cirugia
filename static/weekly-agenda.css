@@ -65,3 +65,5 @@ header nav { justify-content: flex-end; }
 .reservation-cancel-section { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 22px; }
 .reservation-cancel-section summary { color: #a32626; font-weight: 650; }
 .reservation-cancel-button { background: #a32626; }
+
+.reservation-block.overrun-block { background: #795037; }
