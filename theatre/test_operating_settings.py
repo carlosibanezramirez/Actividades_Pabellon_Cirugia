@@ -33,7 +33,7 @@ class OperatingSettingsTests(TestCase):
         self.assertTrue(self.administrator.has_perm('theatre.change_operatingsettings'))
         self.client.force_login(self.administrator)
         url = reverse('admin:theatre_operatingsettings_change', args=[1])
-        response = self.client.post(url, {'preparation_mean_minutes': 20, 'preparation_max_minutes': 40,
+        response = self.client.post(url, {'preparation_mean_minutes': 20, 'preparation_max_minutes': 40, 'allowed_overrun_minutes': 10,
                                           '_save': 'Guardar'})
         self.assertEqual(response.status_code, 302)
         self.policy.refresh_from_db()

@@ -32,6 +32,24 @@ services:
     networks: [database, frontend]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+  overrun-monitor:
+    build: .
+    restart: unless-stopped
+    command: ["python", "manage.py", "monitor_overruns", "--interval", "15"]
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Configure DJANGO_SECRET_KEY en .env}
+      DJANGO_ALLOWED_HOSTS: ${APP_DOMAIN:?Configure APP_DOMAIN en .env}
+      DJANGO_DEBUG: 'false'
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-pabellon}
+      POSTGRES_USER: ${POSTGRES_USER:-pabellon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [database]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
