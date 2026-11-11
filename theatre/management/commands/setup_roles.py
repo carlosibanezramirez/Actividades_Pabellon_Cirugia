@@ -16,5 +16,6 @@ class Command(BaseCommand):
             content_type__app_label='theatre', content_type__model='operatingsettings',
             codename__in=['view_operatingsettings', 'change_operatingsettings'],
         )
-        administrator.permissions.set([operate, correct, *catalog, *settings_permissions])
+        relocations = Permission.objects.filter(content_type__app_label='theatre', codename='view_automaticrelocation')
+        administrator.permissions.set([operate, correct, *catalog, *settings_permissions, *relocations])
         self.stdout.write(self.style.SUCCESS('Perfiles preparados. Asigne los usuarios desde Administración.'))

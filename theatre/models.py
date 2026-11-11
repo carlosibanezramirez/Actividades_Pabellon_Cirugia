@@ -30,12 +30,17 @@ class OperatingSettings(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(1440)],
         help_text='Se activa una alarma visual cuando la preparación real en curso supera este tiempo.',
     )
+    allowed_overrun_minutes = models.PositiveIntegerField(
+        'Tiempo de alargue permitido', default=10, validators=[MinValueValidator(0), MaxValueValidator(1440)],
+        help_text='Minutos después del término programado para buscar otro pabellón para la siguiente reserva.',
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = 'configuración de pabellones'
         verbose_name_plural = 'configuración de pabellones'
         constraints = [
+            models.CheckConstraint(condition=Q(allowed_overrun_minutes__gte=0, allowed_overrun_minutes__lte=1440), name='valid_allowed_overrun'),
             models.CheckConstraint(condition=Q(pk=1), name='single_operating_settings'),
             models.CheckConstraint(condition=Q(preparation_mean_minutes__gte=1, preparation_mean_minutes__lte=1440), name='valid_preparation_mean'),
             models.CheckConstraint(condition=Q(preparation_max_minutes__gte=models.F('preparation_mean_minutes'), preparation_max_minutes__lte=1440), name='valid_preparation_max'),
@@ -195,6 +200,23 @@ class Intervention(models.Model):
 
     def __str__(self):
         return f'Intervención #{self.pk} · {self.room}'
+
+
+class AutomaticRelocation(models.Model):
+    source_intervention = models.OneToOneField(Intervention, on_delete=models.PROTECT, related_name='overrun_relocation')
+    reservation = models.ForeignKey(Reservation, related_name='automatic_relocations', on_delete=models.PROTECT)
+    from_room = models.ForeignKey(Room, related_name='+', on_delete=models.PROTECT)
+    to_room = models.ForeignKey(Room, related_name='+', on_delete=models.PROTECT)
+    starts_at = models.DateTimeField()
+    planned_start_at = models.DateTimeField(null=True)
+    ends_at = models.DateTimeField()
+    allowed_minutes = models.PositiveIntegerField()
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-recorded_at', '-pk']
+        verbose_name = 'reasignación automática por alargue'
+        verbose_name_plural = 'reasignaciones automáticas por alargue'
 
 
 class ReservationAdjustment(models.Model):
