@@ -39,7 +39,7 @@ class OperatingSettingsTests(TestCase):
         self.policy.refresh_from_db()
         self.assertEqual(self.policy.preparation_mean_minutes, 20)
         room_url = reverse('admin:theatre_room_change', args=[self.item.room_id])
-        response = self.client.post(room_url, {'name': self.item.room.name, 'active': 'on',
+        response = self.client.post(room_url, {'name': self.item.room.name, 'room_type': self.item.room.room_type, 'active': 'on',
                                                'opening_time': '08:00', 'closing_time': '22:00', '_save': 'Guardar'})
         self.assertEqual(response.status_code, 302)
         self.item.room.refresh_from_db()

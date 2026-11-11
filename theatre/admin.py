@@ -35,8 +35,9 @@ class CatalogAdmin(admin.ModelAdmin):
 
 @admin.register(Room)
 class RoomAdmin(CatalogAdmin):
-    list_display = ['name', 'opening_time', 'closing_time', 'active']
-    fields = ['name', 'active', 'opening_time', 'closing_time']
+    list_display = ['name', 'room_type', 'opening_time', 'closing_time', 'active']
+    fields = ['name', 'room_type', 'active', 'opening_time', 'closing_time']
+    list_filter = ['room_type', 'active']
     formfield_overrides = {models.TimeField: {'widget': forms.TimeInput(format='%H:%M', attrs={'type': 'time', 'step': 60})}}
 
 

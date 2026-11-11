@@ -55,6 +55,12 @@ class OperatingSettings(models.Model):
 
 
 class Room(Catalog):
+    class Type(models.TextChoices):
+        EMERGENCY = 'emergency', 'Pabellón Urgencias'
+        MAJOR = 'major', 'Pabellón Cirugías Mayores'
+        MINOR = 'minor', 'Pabellón Cirugías Menores'
+
+    room_type = models.CharField('Tipo de pabellón', max_length=12, choices=Type.choices, default=Type.MAJOR)
     opening_time = models.TimeField('Hora de apertura de reservas', default=time(7))
     closing_time = models.TimeField('Hora de cierre de reservas', default=time(23))
 
