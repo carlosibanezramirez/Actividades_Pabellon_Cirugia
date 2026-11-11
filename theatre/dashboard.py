@@ -58,7 +58,7 @@ def room_snapshot():
     now = timezone.now()
     prep_start = Event.objects.filter(intervention_id=OuterRef('pk'), stage=Event.Stage.ROOM_START).values('occurred_at')[:1]
     opened = {
-        item.room_id: item for item in Intervention.objects.filter(completed_at__isnull=True)
+        item.room_id: item for item in Intervention.objects.filter(completed_at__isnull=True, room_engaged=True)
         .select_related('procedure', 'doctor', 'anesthetist')
         .annotate(last_stage=Max('events__stage'), preparation_started=Subquery(prep_start))
     }
@@ -85,7 +85,7 @@ def room_board():
     policy = OperatingSettings.current()
     now = timezone.now()
     # Mostrar la intervención abierta o, si no existe, la última realizada.
-    latest = Intervention.objects.filter(room_id=OuterRef('pk')).annotate(
+    latest = Intervention.objects.filter(room_id=OuterRef('pk'), room_engaged=True).annotate(
         open_priority=Case(When(completed_at__isnull=True, then=Value(0)), default=Value(1)),
     ).order_by('open_priority', '-completed_at', '-created_at', '-pk').values('pk')[:1]
     rooms = list(Room.objects.annotate(board_intervention_id=Subquery(latest)))

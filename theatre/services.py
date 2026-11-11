@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -19,7 +21,7 @@ def create_intervention(*, user, room, procedure, doctor, anesthetist, reservati
         pk=anesthetist.pk, active=True, specialty__active=True, specialty__is_anesthesia=True,
     ).exists():
         raise ValidationError('Seleccione un anestesista activo con especialidad habilitada para anestesia.')
-    if Intervention.objects.filter(room=locked_room, completed_at__isnull=True).exists():
+    if not reservation and Intervention.objects.filter(room=locked_room, completed_at__isnull=True, room_engaged=True).exists():
         raise ValidationError('Este pabellón ya tiene una intervención en curso. Retómela antes de crear otra.')
     from .scheduling import HOUR
     now = timezone.now()
@@ -30,29 +32,49 @@ def create_intervention(*, user, room, procedure, doctor, anesthetist, reservati
         if (reservation.room_id != locked_room.pk or reservation.doctor_id != doctor.pk
                 or reservation.procedure_id != procedure.pk):
             raise ValidationError('El pabellón, médico y tipo de cirugía deben coincidir con la reserva.')
-        if not reservation.starts_at <= now < reservation.ends_at:
-            raise ValidationError('La intervención debe iniciarse dentro del horario reservado.')
+        if now >= reservation.ends_at:
+            raise ValidationError('El horario de la reserva ya finalizó.')
         if Intervention.objects.filter(reservation=reservation).exists():
             raise ValidationError('La reserva ya tiene una intervención asociada.')
     expected_end = reservation.ends_at if reservation and reservation.planned_start_at else now + HOUR
     bookings = Reservation.objects.filter(cancelled_at__isnull=True, room=locked_room, starts_at__lt=expected_end, ends_at__gt=now)
     if reservation:
         bookings = bookings.exclude(pk=reservation.pk)
-    if bookings.exists():
+    if not reservation and bookings.exists():
         raise ValidationError('El pabellón tiene una reserva que coincide con la próxima hora. Inicie desde su reserva o use otro horario.')
-    return Intervention.objects.create(room=locked_room, procedure=procedure, doctor=doctor, anesthetist=anesthetist, created_by=user, reservation=reservation)
+    return Intervention.objects.create(room=locked_room, procedure=procedure, doctor=doctor, anesthetist=anesthetist, created_by=user, reservation=reservation, room_engaged=reservation is None)
 
 
 @transaction.atomic
 def record_event(*, user, intervention_id, stage):
     require_permission(user, 'theatre.operate_intervention')
-    intervention = Intervention.objects.select_for_update().get(pk=intervention_id)
+    room_id = Intervention.objects.values_list('room_id', flat=True).get(pk=intervention_id)
+    Room.objects.select_for_update().get(pk=room_id)
+    intervention = Intervention.objects.select_for_update(of=('self',)).select_related('reservation').get(pk=intervention_id)
     events = list(intervention.events.order_by('stage'))
     if intervention.completed_at or stage != len(events) + 1 or not 1 <= stage <= 9:
         raise ValidationError('El evento ya se registró o no corresponde al siguiente paso. Actualice la página.')
     if stage == Event.Stage.ANESTHESIA_PREP_START and intervention.preoperative_activities.count() < 2:
         raise ValidationError('Complete ambos consentimientos informados antes de iniciar la preparación de anestesia.')
     now = timezone.now()
+    if intervention.reservation_id:
+        booking = intervention.reservation
+        if booking.cancelled_at:
+            raise ValidationError('La reserva está cancelada.')
+        if stage in (Event.Stage.ROOM_START, Event.Stage.ROOM_END) and now < booking.starts_at - timedelta(minutes=30):
+            earliest = timezone.localtime(booking.starts_at - timedelta(minutes=30)).strftime('%d/%m/%Y %H:%M')
+            raise ValidationError(f'La preparación del pabellón puede registrarse desde {earliest}, 30 minutos antes de su inicio programado.')
+        if stage == Event.Stage.ROOM_START:
+            if now >= booking.ends_at:
+                raise ValidationError('El horario de la reserva ya finalizó.')
+            if Reservation.objects.filter(room_id=room_id, cancelled_at__isnull=True,
+                    starts_at__lt=booking.ends_at, ends_at__gt=now).exclude(pk=booking.pk).exists():
+                raise ValidationError('El tramo anticipado coincide con otra reserva del pabellón.')
+    if stage == Event.Stage.ROOM_START:
+        if Intervention.objects.filter(room_id=room_id, room_engaged=True, completed_at__isnull=True).exclude(pk=intervention.pk).exists():
+            raise ValidationError('Este pabellón ya tiene una intervención en curso.')
+        intervention.room_engaged = True
+        intervention.save(update_fields=['room_engaged'])
     if stage == Event.Stage.ANESTHESIA_PREP_START and intervention.preoperative_activities.filter(completed_at__gt=now).exists():
         raise ValidationError('La hora del servidor es anterior al registro de los consentimientos.')
     if events and now < events[-1].occurred_at:
@@ -84,6 +106,8 @@ def correct_event(*, user, intervention_id, event_id, new_at, reason, expected_a
         raise ValidationError('La nueva hora debe ser diferente de la actual.')
     if event.stage == Event.Stage.ANESTHESIA_PREP_START and intervention.preoperative_activities.filter(completed_at__gt=new_at).exists():
         raise ValidationError('La preparación de anestesia no puede ser anterior al registro de los consentimientos.')
+    if intervention.reservation_id and event.stage in (Event.Stage.ROOM_START, Event.Stage.ROOM_END) and new_at < intervention.reservation.starts_at - timedelta(minutes=30):
+        raise ValidationError('La preparación no puede registrarse más de 30 minutos antes de su inicio programado.')
     previous = intervention.events.filter(stage__lt=event.stage).order_by('-stage').first()
     following = intervention.events.filter(stage__gt=event.stage).order_by('stage').first()
     if (previous and new_at < previous.occurred_at) or (following and new_at > following.occurred_at):

@@ -40,7 +40,7 @@ def occupancy(day, now=None, room_id=None, minimum_use=HOUR):
     slots = day_slots(day)
     start, end = slots[0]['start'], slots[-1]['end']
     reservations = Reservation.objects.filter(cancelled_at__isnull=True, starts_at__lt=end, ends_at__gt=start).select_related('doctor', 'procedure', 'room', 'created_by', 'intervention')
-    uses = Intervention.objects.filter(created_at__lt=end).filter(
+    uses = Intervention.objects.filter(room_engaged=True, created_at__lt=end).filter(
         Q(completed_at__isnull=True) | Q(completed_at__gt=start - minimum_use),
     ).select_related('doctor', 'procedure').prefetch_related(Prefetch(
         'events', queryset=Event.objects.filter(stage__in=[1, 2, 9]).order_by('stage'),

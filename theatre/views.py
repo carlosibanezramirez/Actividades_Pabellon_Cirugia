@@ -45,7 +45,7 @@ def open_reservations(request):
         now = timezone.now()
         for booking in bookings:
             intervention = getattr(booking, 'intervention', None)
-            status = ('Finalizada' if intervention.completed_at else 'Intervención iniciada') if intervention else (
+            status = ('Finalizada' if intervention.completed_at else 'Intervención iniciada' if intervention.room_engaged else 'Preoperatorio abierto') if intervention else (
                 'Disponible para iniciar' if booking.starts_at <= now < booking.ends_at else
                 'Programada' if now < booking.starts_at else 'Horario finalizado')
             rows.append({'booking': booking, 'intervention': intervention, 'status': status})
@@ -74,7 +74,7 @@ def open_reservation(request, pk):
     now = timezone.now()
     return render(request, 'theatre/open_reservation.html', {
         'booking': booking, 'form': form,
-        'can_start': not booking.cancelled_at and booking.starts_at <= now < booking.ends_at,
+        'can_start': not booking.cancelled_at and now < booking.ends_at,
         'future': booking.starts_at > now,
     })
 
@@ -309,7 +309,7 @@ def reservation_detail(request, pk):
     booking = get_object_or_404(Reservation.objects.select_related('room', 'doctor', 'procedure', 'created_by', 'intervention'), pk=pk)
     return render(request, 'theatre/reservation_detail.html', {
         'booking': booking,
-        'can_start': not booking.cancelled_at and not hasattr(booking, 'intervention') and booking.starts_at <= timezone.now() < booking.ends_at,
+        'can_start': not booking.cancelled_at and not hasattr(booking, 'intervention') and timezone.now() < booking.ends_at,
     })
 
 
@@ -455,12 +455,16 @@ def detail(request, pk, history=False):
                          'enabled': kind not in preoperative and not intervention.completed_at
                                     and not any(event.stage >= 3 for event in events)}
                         for kind, label in PreoperativeActivity.Kind.choices]
+    from datetime import timedelta
+    earliest_preparation = intervention.reservation.starts_at - timedelta(minutes=30) if intervention.reservation_id else None
+    preparation_locked = bool(earliest_preparation and timezone.now() < earliest_preparation)
     rows = []
     previous = None
     for stage, label in Event.Stage.choices:
         event = by_stage.get(stage)
         elapsed = str(event.occurred_at - previous.occurred_at).split('.')[0] if event and previous else None
-        rows.append({'stage': stage, 'label': label, 'event': event, 'enabled': stage == len(events) + 1 and not intervention.completed_at and (stage != 3 or consents_complete),
+        rows.append({'stage': stage, 'label': label, 'event': event, 'enabled': stage == len(events) + 1 and not intervention.completed_at and (stage != 3 or consents_complete) and not (stage in (1, 2) and preparation_locked),
+                     'preparation_locked': stage in (1, 2) and preparation_locked,
                      'blocked_consent': stage == 3 and len(events) == 2 and not consents_complete, 'elapsed': elapsed})
         if event:
             previous = event
@@ -471,7 +475,7 @@ def detail(request, pk, history=False):
                               events[-1].stage if events and not intervention.completed_at else None,
                               policy.preparation_max_minutes, timezone.now())
     return render(request, 'theatre/activity_history.html' if history else 'theatre/detail.html', {'intervention': intervention, 'rows': rows, 'count': len(events), 'total': total, 'alarm': alarm,
-        'preoperative_rows': preoperative_rows, 'consent_count': len(preoperative)})
+        'preoperative_rows': preoperative_rows, 'consent_count': len(preoperative), 'earliest_preparation': earliest_preparation})
 
 
 @login_required
