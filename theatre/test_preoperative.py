@@ -83,9 +83,26 @@ class PreoperativeTests(TestCase):
             self.complete('operation')
         self.assertEqual(self.item.preoperative_activities.count(), 0)
         self.event(4)  # La actividad en curso se puede continuar.
-        response = self.client.get(reverse('detail', args=[self.item.pk]))
+        response = self.client.get(reverse('activity_history', args=[self.item.pk]))
         self.assertContains(response, 'Sin registro')
         self.assertNotContains(response, 'Marcar como completada')
+
+    def test_completed_cards_hide_but_counts_and_history_remain(self):
+        self.complete('operation')
+        response = self.client.get(reverse('detail', args=[self.item.pk]))
+        self.assertNotContains(response, '<h2>Firma Consentimiento Informado Operación</h2>')
+        self.assertContains(response, '<h2>Firma Consentimiento Informado Anestesia</h2>')
+        self.assertContains(response, '<strong>1 de 2</strong><span>Eventos pre-operatorios</span>')
+        self.assertContains(response, '<strong>0 de 9</strong><span>Eventos cirugía</span>')
+        self.assertNotContains(response, 'Marca cada consentimiento al completarse.')
+        self.event(1)
+        response = self.client.get(reverse('detail', args=[self.item.pk]))
+        self.assertNotContains(response, '<h2>Inicio de preparación del pabellón</h2>')
+        self.assertContains(response, f'action="{reverse("record", args=[self.item.pk, 2])}"')
+        history = self.client.get(reverse('activity_history', args=[self.item.pk]))
+        self.assertContains(history, 'Firma Consentimiento Informado Operación')
+        self.assertContains(history, 'Inicio de preparación del pabellón')
+        self.assertNotContains(history, 'Marcar como completada')
 
     def test_correction_cannot_place_anesthesia_before_consent_completion(self):
         self.event(1)
@@ -100,9 +117,9 @@ class PreoperativeTests(TestCase):
     def test_endpoint_permission_post_only_and_persisted_timestamp(self):
         url = reverse('complete_preoperative', args=[self.item.pk, 'operation'])
         self.assertEqual(self.client.get(url).status_code, 405)
-        self.assertRedirects(self.client.post(url), reverse('detail', args=[self.item.pk]))
+        self.assertRedirects(self.client.post(url), reverse('detail', args=[self.item.pk]) + '#pending-activities')
         activity = PreoperativeActivity.objects.get()
-        response = self.client.get(reverse('detail', args=[self.item.pk]))
+        response = self.client.get(reverse('activity_history', args=[self.item.pk]))
         self.assertContains(response, 'Firma Consentimiento Informado Operación')
         self.assertContains(response, timezone.localtime(activity.completed_at).strftime('%d/%m/%Y %H:%M:%S'))
         outsider = get_user_model().objects.create_user(username='sin-preoperatorio')

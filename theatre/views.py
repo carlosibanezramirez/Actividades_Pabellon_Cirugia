@@ -389,7 +389,7 @@ def create(request):
 @login_required
 @permission_required('theatre.operate_intervention', raise_exception=True)
 @never_cache
-def detail(request, pk):
+def detail(request, pk, history=False):
     intervention = get_object_or_404(Intervention.objects.select_related('room', 'procedure', 'doctor', 'anesthetist', 'created_by', 'reservation'), pk=pk)
     events = list(intervention.events.select_related('recorded_by').prefetch_related('corrections__corrected_by'))
     by_stage = {e.stage: e for e in events}
@@ -414,7 +414,7 @@ def detail(request, pk):
                               events[0].occurred_at if events else None,
                               events[-1].stage if events and not intervention.completed_at else None,
                               policy.preparation_max_minutes, timezone.now())
-    return render(request, 'theatre/detail.html', {'intervention': intervention, 'rows': rows, 'count': len(events), 'total': total, 'alarm': alarm,
+    return render(request, 'theatre/activity_history.html' if history else 'theatre/detail.html', {'intervention': intervention, 'rows': rows, 'count': len(events), 'total': total, 'alarm': alarm,
         'preoperative_rows': preoperative_rows, 'consent_count': len(preoperative)})
 
 
@@ -430,7 +430,7 @@ def record(request, pk, stage):
         messages.error(request, text)
     else:
         messages.success(request, 'Evento registrado con la hora del servidor.')
-    return redirect('detail', pk=pk)
+    return redirect(reverse('detail', args=[pk]) + '#pending-activities')
 
 
 @login_required
@@ -444,7 +444,7 @@ def complete_preoperative(request, pk, kind):
         messages.error(request, ' '.join(error.messages) if isinstance(error, ValidationError) else 'La actividad ya fue registrada.')
     else:
         messages.success(request, 'Actividad preoperatoria registrada con la fecha y hora del servidor.')
-    return redirect('detail', pk=pk)
+    return redirect(reverse('detail', args=[pk]) + '#pending-activities')
 
 
 @login_required

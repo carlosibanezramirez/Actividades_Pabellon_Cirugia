@@ -17,6 +17,7 @@ urlpatterns = [
     path('', views.interventions, name='interventions'),
     path('nueva/', views.create, name='create'),
     path('intervenciones/<int:pk>/', views.detail, name='detail'),
+    path('intervenciones/<int:pk>/historial/', views.detail, {'history': True}, name='activity_history'),
     path('intervenciones/<int:pk>/preoperatorio/<str:kind>/completar/', views.complete_preoperative, name='complete_preoperative'),
     path('intervenciones/<int:pk>/eventos/<int:stage>/registrar/', views.record, name='record'),
     path('intervenciones/<int:pk>/eventos/<int:event_id>/corregir/', views.correct, name='correct'),

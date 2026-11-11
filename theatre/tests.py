@@ -190,7 +190,7 @@ class WorkflowTests(TestCase):
         self.assertEqual(audit.previous_at, original)
         self.assertEqual(audit.new_at, new_at)
         self.assertEqual(audit.corrected_by, self.administrator)
-        self.assertContains(self.client.get(reverse('detail', args=[self.intervention.pk])), 'Corrección de prueba')
+        self.assertContains(self.client.get(reverse('activity_history', args=[self.intervention.pk])), 'Corrección de prueba')
         with self.assertRaises(ValidationError):
             correct_event(user=self.administrator, intervention_id=self.intervention.pk, event_id=first.pk, new_at=new_at, reason='Obsoleto', expected_at=original)
         self.assertEqual(Correction.objects.count(), 1)

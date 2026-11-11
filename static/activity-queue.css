@@ -1,0 +1,6 @@
+#pending-activities { scroll-margin-top: 12px; }
+#pending-activities section .timeline { margin-top: 10px; gap: 8px; }
+#pending-activities section .event { padding: 12px 16px; align-items: center; }
+#pending-activities section .event h2 { font-size: 15px; margin: 0; }
+#pending-activities section .event p { margin: 4px 0 0; }
+#pending-activities section .event button { font-size: 13px; padding: 8px 12px; }
