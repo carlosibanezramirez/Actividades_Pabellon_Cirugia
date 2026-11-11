@@ -1,0 +1,11 @@
+{% extends 'base.html' %}{% block content %}
+<a class="back" href="{% url 'detail' intervention.pk %}">← Volver a las actividades pendientes</a>
+<h1>Historial de actividades · {{ intervention.room }}</h1>
+<section class="summary"><div><strong>{{ consent_count }} de 2</strong><span>Eventos pre-operatorios</span></div><div><strong>{{ count }} de 9</strong><span>Eventos cirugía</span></div>{% if total %}<div><strong>{{ total }}</strong><span>duración entre primer y último evento</span></div>{% endif %}</section>
+<h2>Eventos pre-operatorios</h2>
+{% for row in preoperative_rows %}{% if row.activity %}<article class="card event"><div><h2>{{ row.label }}</h2><p>{{ row.activity.completed_at|date:'d/m/Y H:i:s' }}</p><p class="muted">Registrado por {{ row.activity.completed_by }}</p></div></article>{% else %}<p class="muted">{{ row.label }}: Sin registro</p>{% endif %}{% endfor %}
+<h2>Eventos cirugía</h2>
+{% for row in rows %}{% if row.event %}<article class="event card"><span class="step complete">{{ row.stage }}</span><div class="event-content"><h2>{{ row.label }}</h2><p class="event-time">{{ row.event.occurred_at|date:'d/m/Y H:i:s' }}</p><p class="muted">Registrado por {{ row.event.recorded_by }}{% if row.elapsed %} · {{ row.elapsed }} desde el evento anterior{% endif %}</p>
+{% if row.event.corrections.all %}<details><summary>Ver historial de correcciones</summary><p>Hora original: {{ row.event.original_at|date:'d/m/Y H:i:s.u' }}</p>{% for correction in row.event.corrections.all %}<div class="audit"><p>{{ correction.previous_at|date:'d/m/Y H:i:s.u' }} → {{ correction.new_at|date:'d/m/Y H:i:s.u' }}</p><p>{{ correction.reason }}</p><small>{{ correction.corrected_by }} · {{ correction.corrected_at|date:'d/m/Y H:i:s' }}</small></div>{% endfor %}</details>{% endif %}
+{% if perms.theatre.correct_event %}<a class="correction-link" href="{% url 'correct' intervention.pk row.event.pk %}">Corregir hora</a>{% endif %}</div></article>{% endif %}{% endfor %}
+{% endblock %}
