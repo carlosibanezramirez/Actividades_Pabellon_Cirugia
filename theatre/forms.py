@@ -175,3 +175,22 @@ class RescheduleReservationForm(AgendaDateForm):
 class CancelReservationForm(forms.Form):
     reason = forms.ModelChoiceField(label='Motivo de cancelación', queryset=CancellationReason.objects.filter(active=True))
     revision = forms.CharField(widget=forms.HiddenInput)
+
+
+class ReservationSearchForm(ContinuousReservationForm, AgendaDateForm):
+    diagnosis = forms.CharField(label='Diagnóstico', max_length=2000, widget=forms.Textarea(attrs={'rows': 3}))
+    field_order = ['doctor', 'patient_name', 'patient_rut', 'diagnosis', 'procedure', 'fecha',
+                   'desired_time', 'duration_minutes']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for key, label in {'doctor': 'Nombre del doctor', 'procedure': 'Operación',
+                           'fecha': 'Día del procedimiento', 'desired_time': 'Hora de inicio',
+                           'duration_minutes': 'Duración (minutos)'}.items():
+            self.fields[key].label = label
+
+    def clean_fecha(self):
+        day = super().clean_fecha()
+        if day.year > 9997:
+            raise forms.ValidationError('Seleccione una fecha hasta el año 9997.')
+        return day

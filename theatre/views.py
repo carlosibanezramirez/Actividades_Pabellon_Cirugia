@@ -11,14 +11,83 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
 from django.utils import timezone
 from urllib.parse import urlencode
-from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm, WeeklySummaryForm, RescheduleReservationForm, CancelReservationForm
+from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm, WeeklySummaryForm, RescheduleReservationForm, CancelReservationForm, ReservationSearchForm
 from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
 from .models import Event, Intervention, OperatingSettings, Reservation, Room
-from .weekly_scheduling import continuous_day, reserve_continuous, week_start, reschedule_reservation, reservation_revision, cancel_reservation
+from .weekly_scheduling import continuous_day, reserve_continuous, week_start, reschedule_reservation, reservation_revision, cancel_reservation, find_available_rooms
 from .scheduling import availability, reserve_hours
 from .services import correct_event, create_intervention, record_event
 from .occupancy_summary import weekly_occupancy_summary, active_reservations_for_day
 from .alarms import active_preparations, preparation_alarm
+
+
+@login_required
+@permission_required('theatre.operate_intervention', raise_exception=True)
+@never_cache
+def reservation_search(request):
+    import secrets
+    form = ReservationSearchForm(initial={'fecha': timezone.localdate()})
+    context = {'form': form}
+    searches = request.session.get('reservation_searches', {})
+    now = timezone.now().timestamp()
+    searches = {key: value for key, value in searches.items() if value['expires'] > now}
+    action = request.POST.get('action')
+    if request.method == 'POST':
+        if action == 'search':
+            form = ReservationSearchForm(request.POST)
+        else:
+            pending = searches.get(request.POST.get('token', ''))
+            if pending is None:
+                messages.error(request, 'La búsqueda expiró o ya fue confirmada. Vuelva a buscar disponibilidad.')
+                return redirect('reservation_search')
+            form = ReservationSearchForm(pending['data'])
+        context['form'] = form
+        if form.is_valid():
+            data = form.cleaned_data
+            try:
+                result = find_available_rooms(day=data['fecha'], desired_time=data['desired_time'],
+                                              duration_minutes=data['duration_minutes'])
+                if action == 'search':
+                    token = secrets.token_urlsafe(24)
+                    # Los datos clínicos quedan en la sesión del servidor, no en la URL.
+                    payload = {key: str(request.POST[key]) for key in form.fields}
+                    searches = dict(list(searches.items())[-4:])
+                    searches[token] = {'data': payload, 'expires': now + 900}
+                    context.update(result=result, token=token, searched=True)
+                elif action in ('choose', 'confirm'):
+                    token = request.POST['token']
+                    if action == 'choose':
+                        room_id = request.POST.get('room', '')
+                    else:
+                        room_id = str(pending.get('room', ''))
+                    room = next((room for room in result['rooms'] if str(room.pk) == room_id), None)
+                    if room is None:
+                        context.update(result=result, token=token, searched=True)
+                        form.add_error(None, 'El pabellón seleccionado ya no está disponible. Elija otro resultado o repita la búsqueda.')
+                    elif action == 'choose':
+                        token = secrets.token_urlsafe(24)
+                        searches = dict(list(searches.items())[-4:])
+                        searches[token] = {'data': pending['data'], 'expires': now + 900, 'room': room.pk,
+                                           'preparation_minutes': result['preparation_minutes']}
+                        context.update(result=result, token=token, selected_room=room, confirmation=True)
+                    elif pending.get('preparation_minutes') != result['preparation_minutes']:
+                        searches[token]['preparation_minutes'] = result['preparation_minutes']
+                        context.update(result=result, token=token, selected_room=room, confirmation=True)
+                        form.add_error(None, 'El tiempo de preparación cambió. Revise el horario y confirme nuevamente.')
+                    else:
+                        booking = reserve_continuous(user=request.user, room=room, day=data['fecha'],
+                            desired_time=data['desired_time'], duration_minutes=data['duration_minutes'],
+                            doctor=data['doctor'], procedure=data['procedure'], patient_name=data['patient_name'],
+                            patient_rut=data['patient_rut'], diagnosis=data['diagnosis'],
+                            expected_preparation_minutes=pending['preparation_minutes'])
+                        searches.pop(token, None)
+                        request.session['reservation_searches'] = searches
+                        messages.success(request, 'Reserva confirmada y registrada correctamente.')
+                        return redirect('reservation_detail', pk=booking.pk)
+            except ValidationError as error:
+                form.add_error(None, error)
+    request.session['reservation_searches'] = searches
+    return render(request, 'theatre/reservation_search.html', context)
 
 
 @login_required

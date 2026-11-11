@@ -175,7 +175,7 @@ def continuous_day(room, day, now=None, policy=None):
 
 
 @transaction.atomic
-def reserve_continuous(*, user, room, day, desired_time, duration_minutes, doctor, procedure, patient_name, patient_rut=''):
+def reserve_continuous(*, user, room, day, desired_time, duration_minutes, doctor, procedure, patient_name, patient_rut='', diagnosis='', expected_preparation_minutes=None):
     require_permission(user, 'theatre.operate_intervention')
     patient_rut = normalize_rut(patient_rut)
     if not 1900 <= day.year <= 9997:
@@ -187,6 +187,8 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
     # Django rechaza horas ambiguas o inexistentes durante cambios de horario.
     planned = DateTimeField().clean(datetime.combine(day, desired_time)).astimezone(datetime_timezone.utc)
     policy = OperatingSettings.current()
+    if expected_preparation_minutes is not None and policy.preparation_mean_minutes != expected_preparation_minutes:
+        raise ValidationError('El tiempo de preparación cambió. Busque disponibilidad y confirme nuevamente.')
     start, end = planned - timedelta(minutes=policy.preparation_mean_minutes), planned + timedelta(minutes=duration_minutes)
     now = timezone.now()
     if start < now:
@@ -194,6 +196,9 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
     patient_name = patient_name.strip()
     if not patient_name or len(patient_name) > 180:
         raise ValidationError('Ingrese el nombre del paciente (máximo 180 caracteres).')
+    diagnosis = diagnosis.strip()
+    if len(diagnosis) > 2000:
+        raise ValidationError('El diagnóstico debe tener como máximo 2000 caracteres.')
     locked_room = Room.objects.select_for_update().filter(pk=room.pk, active=True).first()
     if locked_room is None:
         raise ValidationError('El pabellón no está disponible.')
@@ -203,7 +208,7 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
     validate_reservation_space(locked_room, day, planned, start, end, now, policy.preparation_mean_minutes)
     return Reservation.objects.create(
         room=locked_room, doctor=doctor, procedure=procedure, patient_name=patient_name, patient_rut=patient_rut,
-        starts_at=start, planned_start_at=planned, ends_at=end, created_by=user,
+        starts_at=start, planned_start_at=planned, ends_at=end, created_by=user, diagnosis=diagnosis,
     )
 
 
@@ -289,3 +294,27 @@ def cancel_reservation(*, user, reservation_id, reason, expected_revision):
     booking.cancellation_reason_name = cause.name
     booking.save(update_fields=['cancelled_at', 'cancelled_by', 'cancellation_reason', 'cancellation_reason_name'])
     return booking
+
+
+def find_available_rooms(*, day, desired_time, duration_minutes):
+    if not 1900 <= day.year <= 9997:
+        raise ValidationError('Seleccione una fecha entre los años 1900 y 9997.')
+    if desired_time.minute not in (0, 30) or desired_time.second or desired_time.microsecond or desired_time.tzinfo:
+        raise ValidationError('Seleccione un inicio a la hora o media hora.')
+    if isinstance(duration_minutes, bool) or not isinstance(duration_minutes, int) or not 1 <= duration_minutes <= 1440:
+        raise ValidationError('La duración debe ser un número entero entre 1 y 1440 minutos.')
+    planned = DateTimeField().clean(datetime.combine(day, desired_time)).astimezone(datetime_timezone.utc)
+    policy = OperatingSettings.current()
+    start, end = planned - timedelta(minutes=policy.preparation_mean_minutes), planned + timedelta(minutes=duration_minutes)
+    now = timezone.now()
+    if start < now:
+        raise ValidationError('El inicio de preparación del pabellón no puede estar en el pasado.')
+    available = []
+    for room in Room.objects.filter(active=True).order_by('name', 'pk'):
+        try:
+            validate_reservation_space(room, day, planned, start, end, now, policy.preparation_mean_minutes)
+        except ValidationError:
+            continue
+        available.append(room)
+    return {'rooms': available, 'planned': planned, 'start': start, 'end': end,
+            'preparation_minutes': policy.preparation_mean_minutes}
