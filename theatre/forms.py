@@ -157,6 +157,11 @@ class ContinuousReservationForm(forms.Form):
 
 
 class RescheduleReservationForm(AgendaDateForm):
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not (user and (user.is_superuser or user.groups.filter(name='Administrador').exists())):
+            self.fields['room'].queryset = Room.objects.filter(active=True).exclude(room_type=Room.Type.EMERGENCY)
+
     room = forms.ModelChoiceField(label='Pabellón', queryset=Room.objects.filter(active=True))
     desired_time = forms.TimeField(
         label='Hora de inicio', input_formats=['%H:%M'],

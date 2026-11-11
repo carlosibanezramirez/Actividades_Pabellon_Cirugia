@@ -9,6 +9,7 @@ from .models import Doctor, Event, Intervention, Procedure, Reservation, Room
 from .operating import booking_window, validate_booking_window
 from .services import require_permission
 from .rut import normalize_rut
+from .room_access import can_reserve_room, require_room_booking_access
 
 
 HOUR = timedelta(hours=1)
@@ -81,7 +82,7 @@ def occupancy(day, now=None, room_id=None, minimum_use=HOUR):
     return slots, periods
 
 
-def availability(day, now=None):
+def availability(day, now=None, user=None):
     now = now or timezone.now()
     slots, periods = occupancy(day, now)
     priority = {'no_disponible': 1, 'preparacion': 2, 'procedimiento': 3}
@@ -107,7 +108,7 @@ def availability(day, now=None):
             cells.append({**slot, 'value': f'{room.pk}:{slot["index"]}',
                           'time_label': slot['label'],
                           'state': state, 'label': label,
-                          'selectable': room.active and not matches and not outside_hours and slot['start'] >= now,
+                          'selectable': can_reserve_room(user, room) and not matches and not outside_hours and slot['start'] >= now,
                           'past': slot['start'] < now,
                           'busy': busy})
         rows.append({'room': room, 'slots': cells})
@@ -133,6 +134,7 @@ def reserve_hours(*, user, day, selections, doctor, procedure, patient_name, pat
     room = Room.objects.select_for_update().filter(pk=parsed[0][0], active=True).first()
     if room is None:
         raise ValidationError('El pabellón no está disponible.')
+    require_room_booking_access(user, room)
     indexes = sorted(index for _, index in parsed)
     slots = day_slots(day)
     if indexes[0] < 0 or indexes[-1] >= len(slots) or indexes != list(range(indexes[0], indexes[-1] + 1)):

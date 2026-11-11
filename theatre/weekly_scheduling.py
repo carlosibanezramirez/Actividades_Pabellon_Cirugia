@@ -10,6 +10,7 @@ from .operating import booking_window, validate_booking_window
 from .scheduling import day_slots, occupancy
 from .services import require_permission
 from .rut import normalize_rut
+from .room_access import require_room_booking_access
 
 
 WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -175,7 +176,7 @@ def continuous_day(room, day, now=None, policy=None):
 
 
 @transaction.atomic
-def reserve_continuous(*, user, room, day, desired_time, duration_minutes, doctor, procedure, patient_name, patient_rut='', diagnosis='', expected_preparation_minutes=None):
+def reserve_continuous(*, user, room, day, desired_time, duration_minutes, doctor, procedure, patient_name, patient_rut='', diagnosis='', expected_preparation_minutes=None, automatic=False):
     require_permission(user, 'theatre.operate_intervention')
     patient_rut = normalize_rut(patient_rut)
     if not 1900 <= day.year <= 9997:
@@ -202,6 +203,9 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
     locked_room = Room.objects.select_for_update().filter(pk=room.pk, active=True).first()
     if locked_room is None:
         raise ValidationError('El pabellón no está disponible.')
+    if automatic and locked_room.room_type == Room.Type.EMERGENCY:
+        raise ValidationError('Los pabellones de Urgencias no admiten asignación automática.')
+    require_room_booking_access(user, locked_room)
     validate_booking_window(day, planned, end, locked_room)
     if not Doctor.objects.filter(pk=doctor.pk, active=True).exists() or not Procedure.objects.filter(pk=procedure.pk, active=True).exists():
         raise ValidationError('Seleccione un médico y un tipo de cirugía activos.')
@@ -256,6 +260,8 @@ def reschedule_reservation(*, user, reservation_id, room, day, desired_time, exp
     destination = rooms.get(room.pk)
     if destination is None or not destination.active:
         raise ValidationError('El pabellón no está disponible.')
+    require_room_booking_access(user, rooms[old_room_id])
+    require_room_booking_access(user, destination)
     old_planned = booking.planned_start_at or booking.starts_at
     preparation = old_planned - booking.starts_at
     duration = booking.ends_at - old_planned
@@ -310,7 +316,7 @@ def find_available_rooms(*, day, desired_time, duration_minutes):
     if start < now:
         raise ValidationError('El inicio de preparación del pabellón no puede estar en el pasado.')
     available = []
-    for room in Room.objects.filter(active=True).order_by('name', 'pk'):
+    for room in Room.objects.filter(active=True).exclude(room_type=Room.Type.EMERGENCY).order_by('name', 'pk'):
         try:
             validate_reservation_space(room, day, planned, start, end, now, policy.preparation_mean_minutes)
         except ValidationError:

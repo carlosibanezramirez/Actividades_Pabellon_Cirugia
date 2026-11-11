@@ -19,6 +19,7 @@ from .weekly_scheduling import continuous_day, reserve_continuous, week_start, r
 from .scheduling import availability, reserve_hours
 from .services import correct_event, create_intervention, record_event
 from .occupancy_summary import weekly_occupancy_summary, active_reservations_for_day
+from .room_access import can_reserve_room
 from .alarms import active_preparations, preparation_alarm
 
 
@@ -88,7 +89,7 @@ def reservation_search(request):
                             desired_time=data['desired_time'], duration_minutes=data['duration_minutes'],
                             doctor=data['doctor'], procedure=data['procedure'], patient_name=data['patient_name'],
                             patient_rut=data['patient_rut'], diagnosis=data['diagnosis'],
-                            expected_preparation_minutes=pending['preparation_minutes'])
+                            expected_preparation_minutes=pending['preparation_minutes'], automatic=True)
                         searches.pop(token, None)
                         request.session['reservation_searches'] = searches
                         messages.success(request, 'Reserva confirmada y registrada correctamente.')
@@ -143,8 +144,11 @@ def weekly_summary(request):
     context = {'form': form}
     if form.is_valid():
         monday = week_start(form.cleaned_data['fecha'])
+        rows = weekly_occupancy_summary(monday)
+        for row in rows:
+            row['can_book'] = can_reserve_room(request.user, row['room'])
         context.update({
-            'rooms': weekly_occupancy_summary(monday),
+            'rooms': rows,
             'monday': monday, 'sunday': monday + timedelta(days=6),
             'previous_query': urlencode({'fecha': (monday - timedelta(days=7)).isoformat()}),
             'next_query': urlencode({'fecha': (monday + timedelta(days=7)).isoformat()}),
@@ -203,7 +207,8 @@ def weekly_day(request, room_id, day_string):
         'no_start_for_gap': request.GET.get('sin_inicio') == '1',
         'suggestion_expired': bool(suggested and suggested not in allowed),
         'week_query': urlencode({'room': room.pk, 'fecha': day.isoformat()}),
-        'can_book': room.active and day >= timezone.localdate(),
+        'can_book': can_reserve_room(request.user, room) and day >= timezone.localdate(),
+        'restricted_emergency': room.room_type == Room.Type.EMERGENCY and not can_reserve_room(request.user, room),
     })
 
 
@@ -235,7 +240,7 @@ def agenda(request):
             return redirect('reservation_detail', pk=booking.pk)
     return render(request, 'theatre/agenda.html', {
         'date_form': date_form, 'form': form, 'day': day,
-        'schedule': availability(day) if day else None,
+        'schedule': availability(day, user=request.user) if day else None,
         'selected_slots': request.POST.getlist('slots') if request.method == 'POST' else [],
         'snapshot_at': timezone.now(),
     })
@@ -260,7 +265,7 @@ def reservation_edit(request, pk):
     planned = timezone.localtime(booking.planned_start_at or booking.starts_at)
     initial = {'room': booking.room_id, 'fecha': planned.date(), 'desired_time': planned.strftime('%H:%M'),
                'revision': signing.dumps(reservation_revision(booking), salt='reservation-edit')}
-    form = RescheduleReservationForm(request.POST if request.method == 'POST' else None, initial=initial)
+    form = RescheduleReservationForm(request.POST if request.method == 'POST' else None, initial=initial, user=request.user)
     if request.method == 'POST' and form.is_valid():
         try:
             revision = signing.loads(form.cleaned_data['revision'], salt='reservation-edit')
@@ -308,7 +313,7 @@ def reservation_cancel(request, pk):
                 'room': updated.room_id, 'fecha': timezone.localdate(updated.starts_at).isoformat(),
             })})
     planned = timezone.localtime(booking.planned_start_at or booking.starts_at)
-    edit_form = RescheduleReservationForm(initial={
+    edit_form = RescheduleReservationForm(user=request.user, initial={
         'room': booking.room_id, 'fecha': planned.date(), 'desired_time': planned.strftime('%H:%M'),
         'revision': signing.dumps(reservation_revision(booking), salt='reservation-edit'),
     })
