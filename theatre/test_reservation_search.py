@@ -1,4 +1,5 @@
 from datetime import time, timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -17,6 +18,8 @@ class ReservationSearchTests(TestCase):
         self.other = Room.objects.create(name='Pabellón alternativo')
         Room.objects.create(name='Pabellón inactivo', active=False)
         self.client.force_login(self.user)
+        self.random_choice = patch('theatre.views.choose_available_room', side_effect=lambda rooms: self.other if self.other in rooms else rooms[0]).start()
+        self.addCleanup(patch.stopall)
         self.url = reverse('reservation_search')
         self.data = dict(action='search', doctor=self.item.doctor_id, patient_name='Paciente ficticio búsqueda',
                          patient_rut='12.345.678-5', diagnosis='Diagnóstico ficticio de prueba',
@@ -31,16 +34,16 @@ class ReservationSearchTests(TestCase):
     def search(self):
         return self.client.post(self.url, self.data)
 
-    def choose(self, token, room=None):
-        return self.client.post(self.url, {'action': 'choose', 'token': token, 'room': (room or self.other).pk})
-
-    def test_three_steps_no_write_before_confirmation_and_diagnosis_persisted(self):
+    def test_automatic_assignment_no_write_before_confirmation_and_diagnosis_persisted(self):
         result = self.search()
         self.assertEqual({r.pk for r in result.context['result']['rooms']}, {self.item.room_id, self.other.pk})
         self.assertEqual(Reservation.objects.count(), 0)
-        review = self.choose(result.context['token'])
+        review = result
         self.assertContains(review, 'Confirmar reserva')
         self.assertContains(review, self.data['diagnosis'])
+        self.assertContains(review, 'Pabellón asignado automáticamente')
+        self.assertNotContains(review, 'Seleccionar y revisar')
+        self.random_choice.assert_called_once()
         self.assertContains(review, '09:15')
         self.assertContains(review, '09:30')
         self.assertContains(review, '11:00')
@@ -49,7 +52,7 @@ class ReservationSearchTests(TestCase):
         response = self.client.post(self.url, {'action': 'confirm', 'token': confirmation, 'room': self.item.room_id,
                                                'patient_name': 'Dato manipulado', 'diagnosis': 'Manipulado'})
         booking = Reservation.objects.get()
-        self.assertRedirects(response, reverse('reservation_detail', args=[booking.pk]))
+        self.assertRedirects(response, self.url + f'?confirmada={booking.pk}')
         self.assertEqual(booking.room, self.other)
         self.assertEqual(booking.diagnosis, self.data['diagnosis'])
         self.assertEqual(booking.patient_name, self.data['patient_name'])
@@ -71,14 +74,14 @@ class ReservationSearchTests(TestCase):
 
     def test_availability_is_rechecked_on_confirm(self):
         result = self.search()
-        review = self.choose(result.context['token'])
+        review = result
         self.reserve()
         response = self.client.post(self.url, {'action': 'confirm', 'token': review.context['token']})
         self.assertContains(response, 'ya no está disponible')
         self.assertEqual(Reservation.objects.count(), 1)
 
     def test_preparation_change_requires_another_confirmation(self):
-        review = self.choose(self.search().context['token'])
+        review = self.search()
         policy = OperatingSettings.current()
         policy.preparation_mean_minutes = 20
         policy.save()
@@ -99,7 +102,7 @@ class ReservationSearchTests(TestCase):
         self.client.post(self.url, {'action': 'confirm', 'token': 'no-existe'})
         result = self.search()
         token = result.context['token']
-        self.client.post(self.url, {'action': 'confirm', 'token': token})  # No se seleccionó pabellón.
+
         session = self.client.session
         searches = session['reservation_searches']
         searches[token]['expires'] = 0
@@ -126,13 +129,26 @@ class ReservationSearchTests(TestCase):
         self.reserve(clock=time(1), duration=60, day=self.day + timedelta(days=1))
         self.assertNotIn(self.other, find_available_rooms(day=self.day, desired_time=time(23), duration_minutes=180)['rooms'])
 
-    def test_review_selection_is_not_changed_by_another_review(self):
-        token = self.search().context['token']
-        first = self.choose(token)
-        second = self.choose(token, self.item.room)
-        self.assertNotEqual(first.context['token'], second.context['token'])
-        self.client.post(self.url, {'action': 'confirm', 'token': first.context['token']})
+    def test_no_manual_choice_or_reassignment_via_post(self):
+        review = self.search()
+        token = review.context['token']
+        response = self.client.post(self.url, {'action': 'choose', 'token': token, 'room': self.item.room_id})
+        self.assertContains(response, 'Acción no válida')
+        self.assertFalse(Reservation.objects.exists())
+        response = self.client.post(self.url, {'action': 'confirm', 'token': token, 'room': self.item.room_id})
         self.assertEqual(Reservation.objects.get().room, self.other)
+        saved = self.client.get(response.url)
+        self.assertContains(saved, 'Reserva confirmada')
+        self.assertContains(saved, '<strong>Pabellón alternativo</strong>')
+        self.assertNotContains(saved, 'Sí, confirmar y guardar')
+
+    def test_no_availability_does_not_call_random_or_create_reservation(self):
+        self.reserve()
+        self.reserve(room=self.item.room)
+        response = self.search()
+        self.assertContains(response, 'No hay pabellones disponibles')
+        self.assertEqual(self.random_choice.call_count, 0)
+        self.assertEqual(Reservation.objects.count(), 2)
 
     def test_permissions(self):
         self.client.logout()
