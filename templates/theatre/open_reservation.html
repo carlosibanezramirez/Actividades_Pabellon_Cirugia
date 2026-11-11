@@ -5,6 +5,6 @@
 <section class="card narrow"><h1>Abrir reserva #{{ booking.pk }}</h1>
 <dl><dt>Pabellón</dt><dd>{{ booking.room }}</dd><dt>Operación</dt><dd>{{ booking.procedure }}</dd><dt>Paciente</dt><dd>{{ booking.patient_name }} · RUT: {{ booking.patient_rut|default:'No registrado' }}</dd><dt>Cirujano</dt><dd>{{ booking.doctor }}</dd>{% if booking.diagnosis %}<dt>Diagnóstico</dt><dd>{{ booking.diagnosis }}</dd>{% endif %}<dt>Horario reservado, incluida preparación</dt><dd>{{ booking.starts_at|date:'d/m/Y H:i' }} – {{ booking.ends_at|date:'d/m/Y H:i' }}</dd></dl>
 {% if not can_start %}{{ form.non_field_errors }}{% endif %}
-{% if booking.cancelled_at %}<p class="message error">Esta reserva está cancelada y no puede iniciarse.</p>{% elif can_start %}<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Comenzar registro de eventos</button></form>{% elif future %}<p class="message">Podrá comenzar el registro desde {{ booking.starts_at|date:'d/m/Y H:i' }}, al iniciar el tramo de preparación reservado.</p>{% else %}<p class="message">El horario de esta reserva ya finalizó y no tiene una intervención iniciada.</p>{% endif %}
+{% if booking.cancelled_at %}<p class="message error">Esta reserva está cancelada y no puede iniciarse.</p>{% elif can_start %}<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Abrir preoperatorio y eventos</button></form>{% else %}<p class="message">El horario de esta reserva ya finalizó y no tiene una intervención iniciada.</p>{% endif %}
 </section>
 {% endblock %}

@@ -191,8 +191,6 @@ class SchedulingTests(TestCase):
         Intervention.objects.filter(pk=self.intervention.pk).update(completed_at=timezone.now())
         args = dict(user=self.user, room=self.room, doctor=self.intervention.doctor,
                     procedure=self.intervention.procedure, anesthetist=self.intervention.anesthetist)
-        with self.assertRaises(ValidationError):
-            create_intervention(**args, reservation=booking)
         with patch('theatre.services.timezone.now', return_value=booking.starts_at + timedelta(minutes=5)):
             with self.assertRaises(ValidationError):
                 create_intervention(**args)

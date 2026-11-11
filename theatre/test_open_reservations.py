@@ -39,7 +39,7 @@ class OpenReservationTests(TestCase):
     def test_get_only_reviews_post_opens_without_recording_events(self):
         before = Intervention.objects.count()
         response = self.client.get(self.url)
-        self.assertContains(response, 'Comenzar registro de eventos')
+        self.assertContains(response, 'Abrir preoperatorio y eventos')
         self.assertContains(response, self.booking.diagnosis)
         self.assertEqual(Intervention.objects.count(), before)
         response = self.client.post(self.url, {'anesthetist': self.item.anesthetist_id,
@@ -64,10 +64,10 @@ class OpenReservationTests(TestCase):
 
     def test_future_expired_cancelled_and_occupied_cannot_start(self):
         original = (self.booking.starts_at, self.booking.planned_start_at, self.booking.ends_at)
-        for shift in [timedelta(days=1), -timedelta(days=1)]:
+        for shift in [-timedelta(days=1)]:
             self.booking.starts_at, self.booking.planned_start_at, self.booking.ends_at = [value + shift for value in original]
             self.booking.save()
-            self.assertNotContains(self.client.get(self.url), 'Comenzar registro de eventos')
+            self.assertNotContains(self.client.get(self.url), 'Abrir preoperatorio y eventos')
             self.client.post(self.url, {'anesthetist': self.item.anesthetist_id})
             self.assertFalse(Intervention.objects.filter(reservation=self.booking).exists())
         self.booking.starts_at, self.booking.planned_start_at, self.booking.ends_at = original
@@ -81,7 +81,7 @@ class OpenReservationTests(TestCase):
         self.item.completed_at = None
         self.item.save()
         self.client.post(self.url, {'anesthetist': self.item.anesthetist_id})
-        self.assertFalse(Intervention.objects.filter(reservation=self.booking).exists())
+        self.assertFalse(Intervention.objects.get(reservation=self.booking).room_engaged)
 
     def test_permissions_and_invalid_filters(self):
         self.client.logout()

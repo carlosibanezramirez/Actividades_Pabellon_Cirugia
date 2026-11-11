@@ -178,11 +178,12 @@ class Intervention(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    room_engaged = models.BooleanField('Uso físico del pabellón iniciado', default=True)
 
     class Meta:
         ordering = ['-created_at']
         permissions = [('operate_intervention', 'Puede registrar intervenciones y eventos'), ('correct_event', 'Puede corregir horarios con auditoría')]
-        constraints = [models.UniqueConstraint(fields=['room'], condition=Q(completed_at__isnull=True), name='one_open_intervention_per_room')]
+        constraints = [models.UniqueConstraint(fields=['room'], condition=Q(completed_at__isnull=True, room_engaged=True), name='one_open_intervention_per_room')]
 
     def __str__(self):
         return f'Intervención #{self.pk} · {self.room}'
