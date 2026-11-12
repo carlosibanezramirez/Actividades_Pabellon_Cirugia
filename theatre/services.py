@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
+from .medical_access import require_medical_access
 from .models import Correction, Doctor, Event, Intervention, Procedure, Reservation, Room, PreoperativeActivity
 
 
@@ -13,7 +14,7 @@ def require_permission(user, permission):
 
 @transaction.atomic
 def create_intervention(*, user, room, procedure, doctor, anesthetist, reservation=None):
-    require_permission(user, 'theatre.operate_intervention')
+    require_medical_access(user, doctor.pk)
     locked_room = Room.objects.select_for_update().get(pk=room.pk)
     if not locked_room.active or not Procedure.objects.get(pk=procedure.pk).active or not Doctor.objects.get(pk=doctor.pk).active:
         raise ValidationError('Seleccione elementos activos de las listas.')
@@ -49,7 +50,7 @@ def create_intervention(*, user, room, procedure, doctor, anesthetist, reservati
 
 @transaction.atomic
 def record_event(*, user, intervention_id, stage):
-    require_permission(user, 'theatre.operate_intervention')
+    require_medical_access(user, Intervention.objects.get(pk=intervention_id).doctor_id)
     room_id = Intervention.objects.values_list('room_id', flat=True).get(pk=intervention_id)
     Room.objects.select_for_update().get(pk=room_id)
     intervention = Intervention.objects.select_for_update(of=('self',)).select_related('reservation').get(pk=intervention_id)
@@ -133,7 +134,7 @@ def correct_event(*, user, intervention_id, event_id, new_at, reason, expected_a
 
 @transaction.atomic
 def complete_preoperative_activity(*, user, intervention_id, kind):
-    require_permission(user, 'theatre.operate_intervention')
+    require_medical_access(user, Intervention.objects.get(pk=intervention_id).doctor_id)
     intervention = Intervention.objects.select_for_update().get(pk=intervention_id)
     if kind not in PreoperativeActivity.Kind.values:
         raise ValidationError('La actividad preoperatoria no es válida.')

@@ -72,9 +72,9 @@ class ProfileUserAdmin(UserAdmin):
 
 @admin.register(Doctor)
 class DoctorAdmin(CatalogAdmin):
-    list_display = ['name', 'specialty', 'user', 'email', 'active']
+    list_display = ['name', 'specialty', 'user', 'email', 'mobile_phone', 'alternate_phone', 'active']
     list_filter = ['active', 'specialty']
-    search_fields = ['name', 'email', 'specialty__name', 'user__username']
+    search_fields = ['name', 'email', 'mobile_phone', 'alternate_phone', 'specialty__name', 'user__username']
     list_select_related = ['specialty']
 
     def save_model(self, request, obj, form, change):

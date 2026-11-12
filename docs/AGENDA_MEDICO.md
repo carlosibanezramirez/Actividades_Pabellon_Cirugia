@@ -1,10 +1,16 @@
 # Agenda personal del médico
 
-Aplicar las migraciones hasta 0022 y ejecutar `python manage.py setup_roles`.
+Aplicar las migraciones hasta 0023 y ejecutar `python manage.py setup_roles`.
 
 En Administración, crear una cuenta de usuario con contraseña y correo electrónico. En **Médicos**, vincularla mediante **Cuenta de acceso del médico**. El vínculo asigna automáticamente el perfil **Médico**; al desvincularla se retira ese perfil. Una cuenta solo puede estar vinculada a un médico. Para acceso limitado a su agenda, no agregar perfiles Operador o Administrador: los permisos de perfiles se acumulan.
 
-Al iniciar sesión, el médico activo vinculado entra en **Mi agenda**. Puede cambiar de semana y consultar sus reservas, pacientes, pabellones, estados y eventos registrados. La vista es de consulta; no permite modificar reservas ni registrar eventos. Se incluyen las intervenciones de las que es cirujano responsable, también las creadas sin reserva. Las reservas canceladas y pendientes de reprogramación conservan su estado visible. Los enlaces comprueban la propiedad en el servidor.
+Al iniciar sesión, el médico activo vinculado entra en **Mi agenda**, que utiliza la misma vista de **Agenda semanal**. Permite elegir pabellón y semana, consultar el día, reservar a su nombre y abrir el cuadro para editar o cancelar sus reservas conforme a las reglas existentes. El cirujano del formulario queda fijado al usuario conectado. Solo se muestran sus bloques y datos de pacientes; la ocupación ajena mantiene el horario indisponible, sin exponer información identificable. Las validaciones de espacio consideran todas las reservas del pabellón.
+
+**Abrir reserva** muestra exclusivamente sus reservas del día actual; cambiar la fecha en la URL no amplía ese listado. Puede abrir su reserva y registrar sus eventos, con las mismas restricciones de secuencia y anticipación. Los accesos a reservas e intervenciones ajenas devuelven 404, incluida la edición y cancelación.
+
+El menú del médico contiene Mi agenda y Abrir reserva, sin Ocupación semanal ni Agenda y reservas. Para estos accesos, el alcance personal se conserva aunque la cuenta también tenga perfil Operador. Otros permisos administrativos explícitos siguen vigentes.
+
+En **Administración → Médicos** se pueden registrar **Teléfono móvil (SMS y WhatsApp)** y **Teléfono alternativo**. Ambos son opcionales para conservar las fichas existentes. Se recomienda ingresar el móvil con código internacional; guardar un teléfono todavía no activa SMS ni WhatsApp.
 
 ## Recordatorios
 
