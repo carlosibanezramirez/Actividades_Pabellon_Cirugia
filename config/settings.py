@@ -79,3 +79,5 @@ if not DEBUG:
     SILENCED_SYSTEM_CHECKS = ['security.W005', 'security.W021']
     # El contenedor web solo es accesible desde Caddy en la red interna.
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+SMTP_CREDENTIAL_KEY = os.getenv("SMTP_CREDENTIAL_KEY") or SECRET_KEY

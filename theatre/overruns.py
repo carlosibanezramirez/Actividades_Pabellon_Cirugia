@@ -48,11 +48,14 @@ def relocate_next_reservation(intervention_id, now=None):
         relocation = AutomaticRelocation.objects.create(source_intervention=source, reservation=following,
             from_room=original_room, to_room=target, starts_at=following.starts_at,
             planned_start_at=following.planned_start_at, ends_at=following.ends_at, allowed_minutes=allowed)
+        from .notifications import reservation_summary, queue_reservation_notification
+        previous_summary = reservation_summary(following)
         following.room = target
         following.save(update_fields=['room'])
         if active_intervention:
             active_intervention.room = target
             active_intervention.save(update_fields=['room'])
+        queue_reservation_notification(following, 'relocated', event_key=f'relocation:{relocation.pk}', previous_summary=previous_summary)
         return relocation
     return None
 

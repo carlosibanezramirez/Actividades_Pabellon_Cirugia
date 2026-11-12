@@ -1,11 +1,17 @@
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 from django.db.models import Q
-from .forms import ProfileUserChangeForm, ProfileUserCreationForm
-from .models import CancellationReason, Correction, Doctor, Event, Intervention, OperatingSettings, Procedure, Reservation, Room, Specialty, PreoperativeActivity, ReservationAdjustment, AutomaticRelocation
+from django.core.exceptions import PermissionDenied
+from django.shortcuts import redirect
+from django.urls import path, reverse
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.debug import sensitive_post_parameters
+from .forms import ProfileUserChangeForm, ProfileUserCreationForm, EmailSettingsForm
+from .models import CancellationReason, Correction, Doctor, Event, Intervention, OperatingSettings, Procedure, Reservation, Room, Specialty, PreoperativeActivity, ReservationAdjustment, AutomaticRelocation, EmailSettings, EmailNotification
 
 
 @admin.register(OperatingSettings)
@@ -59,14 +65,15 @@ class ProfileUserAdmin(UserAdmin):
         ('Datos personales', {'fields': ('first_name', 'last_name', 'email')}),
         ('Perfiles', {'fields': ('groups', 'is_staff')}),
     )
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     filter_horizontal = ('user_permissions',)
 
 
 @admin.register(Doctor)
 class DoctorAdmin(CatalogAdmin):
-    list_display = ['name', 'specialty', 'active']
+    list_display = ['name', 'specialty', 'email', 'active']
     list_filter = ['active', 'specialty']
-    search_fields = ['name', 'specialty__name']
+    search_fields = ['name', 'email', 'specialty__name']
     list_select_related = ['specialty']
 
     def get_form(self, request, obj=None, **kwargs):
@@ -128,3 +135,74 @@ class ReservationAdmin(ReadOnlyAdmin):
     list_display = ['id', 'room', 'starts_at', 'ends_at', 'doctor', 'procedure', 'patient_name', 'created_by', 'cancelled_at', 'cancellation_reason_name', 'cancelled_by']
     list_filter = ['room', 'doctor']
     search_fields = ['patient_name', 'patient_rut', 'doctor__name']
+
+
+@admin.register(EmailSettings)
+class EmailSettingsAdmin(admin.ModelAdmin):
+    form = EmailSettingsForm
+    change_form_template = 'admin/theatre/emailsettings/change_form.html'
+    fieldsets = [
+        ('Envío SMTP con STARTTLS', {'fields': ['enabled', 'host', 'port', 'username', 'smtp_password', 'password_saved']}),
+        ('Remitente y aplicación', {'fields': ['from_email', 'from_name', 'public_url']}),
+        ('Avisos habilitados', {'fields': ['notify_confirmed', 'notify_modified', 'notify_cancelled',
+                                          'notify_relocated', 'notify_reschedule']}),
+    ]
+    readonly_fields = ['password_saved']
+
+    @method_decorator(sensitive_post_parameters('smtp_password', 'username'))
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    @admin.display(description='Contraseña almacenada', boolean=True)
+    def password_saved(self, obj):
+        return bool(obj and obj.password_ciphertext)
+
+    def has_add_permission(self, request):
+        return super().has_add_permission(request) and not EmailSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_urls(self):
+        return [path('prueba/', self.admin_site.admin_view(self.send_test), name='theatre_emailsettings_test')] + super().get_urls()
+
+    def send_test(self, request):
+        if request.method != 'POST':
+            from django.http import HttpResponseNotAllowed
+            return HttpResponseNotAllowed(['POST'])
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        from .notifications import queue_test_email
+        config = EmailSettings.objects.filter(pk=1, enabled=True).first()
+        if config is None:
+            messages.error(request, 'Guarde y active la configuración antes de enviar una prueba.')
+        elif not request.user.email:
+            messages.error(request, 'Ingrese su correo en su cuenta de usuario antes de enviar una prueba.')
+        else:
+            from django.core.exceptions import ValidationError
+            try:
+                queue_test_email(config, request.user.email)
+            except ValidationError:
+                messages.error(request, 'Su cuenta debe tener una dirección de correo válida.')
+                return redirect(reverse('admin:theatre_emailsettings_changelist'))
+            messages.success(request, 'Prueba encolada para su correo. Consulte Notificaciones por correo para ver el resultado.')
+        return redirect(reverse('admin:theatre_emailsettings_changelist'))
+
+
+@admin.register(EmailNotification)
+class EmailNotificationAdmin(ReadOnlyAdmin):
+    list_display = ['created_at', 'reservation', 'event', 'recipient', 'status', 'attempts', 'sent_at']
+    list_filter = ['status', 'event']
+    search_fields = ['recipient']
+    exclude = ['dedupe_key']
+    actions = ['retry_failed']
+
+    @admin.action(description='Reintentar notificaciones fallidas', permissions=['retry'])
+    def has_retry_permission(self, request):
+        return request.user.has_perm('theatre.change_emailsettings')
+
+    def retry_failed(self, request, queryset):
+        if not request.user.has_perm('theatre.change_emailsettings'):
+            raise PermissionDenied
+        count = queryset.filter(status='failed').update(status='pending', attempts=0, next_attempt_at=timezone.now(), last_error='')
+        self.message_user(request, f'Notificaciones reencoladas: {count}')

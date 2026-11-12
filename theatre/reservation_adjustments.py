@@ -6,6 +6,9 @@ from .models import Event, Reservation, ReservationAdjustment
 
 
 def save_adjustment(booking, intervention, user, start, planned, end, reason, needs_rescheduling=False):
+    from .notifications import reservation_summary, queue_reservation_notification
+    previous_summary = reservation_summary(booking)
+    was_pending = booking.needs_rescheduling
     previous = (booking.starts_at, booking.planned_start_at, booking.ends_at)
     if booking.original_starts_at is None:
         booking.original_starts_at, booking.original_planned_start_at, booking.original_ends_at = previous
@@ -13,9 +16,12 @@ def save_adjustment(booking, intervention, user, start, planned, end, reason, ne
     booking.timing_adjusted = True
     booking.needs_rescheduling = needs_rescheduling
     booking.save()
-    ReservationAdjustment.objects.create(reservation=booking, source_intervention=intervention,
+    adjustment = ReservationAdjustment.objects.create(reservation=booking, source_intervention=intervention,
         previous_start=previous[0], previous_planned_start=previous[1], previous_end=previous[2],
         new_start=start, new_planned_start=planned, new_end=end, reason=reason, recorded_by=user)
+
+    event = 'reschedule' if needs_rescheduling and not was_pending else 'modified'
+    queue_reservation_notification(booking, event, event_key=f'adjustment:{adjustment.pk}', previous_summary=previous_summary)
 
 
 def reconcile_patient_exit(intervention, exit_at, user):

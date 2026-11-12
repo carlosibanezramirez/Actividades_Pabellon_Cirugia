@@ -19,6 +19,7 @@ services:
     restart: unless-stopped
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Configure DJANGO_SECRET_KEY en .env}
+      SMTP_CREDENTIAL_KEY: ${SMTP_CREDENTIAL_KEY:-}
       DJANGO_ALLOWED_HOSTS: ${APP_DOMAIN:?Configure APP_DOMAIN en .env}
       DJANGO_CSRF_TRUSTED_ORIGINS: https://${APP_DOMAIN}
       DJANGO_DEBUG: 'false'
@@ -38,6 +39,7 @@ services:
     command: ["python", "manage.py", "monitor_overruns", "--interval", "15"]
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Configure DJANGO_SECRET_KEY en .env}
+      SMTP_CREDENTIAL_KEY: ${SMTP_CREDENTIAL_KEY:-}
       DJANGO_ALLOWED_HOSTS: ${APP_DOMAIN:?Configure APP_DOMAIN en .env}
       DJANGO_DEBUG: 'false'
       POSTGRES_HOST: db
@@ -48,6 +50,24 @@ services:
       db:
         condition: service_healthy
     networks: [database]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  mail-delivery:
+    build: .
+    restart: unless-stopped
+    command: ["python", "manage.py", "send_notifications", "--interval", "15"]
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Configure DJANGO_SECRET_KEY en .env}
+      SMTP_CREDENTIAL_KEY: ${SMTP_CREDENTIAL_KEY:-}
+      DJANGO_DEBUG: 'false'
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-pabellon}
+      POSTGRES_USER: ${POSTGRES_USER:-pabellon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [database, mail_outbound]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
   caddy:
@@ -73,3 +93,4 @@ networks:
   database:
     internal: true
   frontend:
+  mail_outbound:

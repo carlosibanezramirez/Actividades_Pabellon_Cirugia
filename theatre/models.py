@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 
 class Catalog(models.Model):
@@ -102,6 +103,7 @@ class Specialty(Catalog):
 
 
 class Doctor(Catalog):
+    email = models.EmailField('Correo electrónico', blank=True)
     specialty = models.ForeignKey(
         Specialty, verbose_name='Especialidad', on_delete=models.PROTECT,
         blank=True, null=True,
@@ -294,3 +296,79 @@ class Correction(models.Model):
 
     class Meta:
         ordering = ['corrected_at', 'pk']
+
+
+class EmailSettings(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    enabled = models.BooleanField('Activar notificaciones por correo', default=False)
+    host = models.CharField('Servidor SMTP', max_length=253, blank=True)
+    port = models.PositiveIntegerField('Puerto SMTP (STARTTLS)', default=587,
+                                       validators=[MinValueValidator(1), MaxValueValidator(65535)])
+    username = models.CharField('Usuario SMTP', max_length=254, blank=True)
+    password_ciphertext = models.TextField(editable=False, blank=True)
+    from_email = models.EmailField('Correo remitente', blank=True)
+    from_name = models.CharField('Nombre del remitente', max_length=120, default='Surgeon — Gestión de Pabellones')
+    public_url = models.URLField('Dirección HTTPS de la aplicación', blank=True)
+    notify_confirmed = models.BooleanField('Reserva confirmada', default=True)
+    notify_modified = models.BooleanField('Reserva modificada', default=True)
+    notify_cancelled = models.BooleanField('Reserva cancelada', default=True)
+    notify_relocated = models.BooleanField('Reasignación automática', default=True)
+    notify_reschedule = models.BooleanField('Pendiente de reprogramación', default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def set_password(self, value):
+        from .smtp_credentials import encrypt_password
+        self.password_ciphertext = encrypt_password(value)
+
+    def get_password(self):
+        from .smtp_credentials import decrypt_password
+        return decrypt_password(self.password_ciphertext)
+
+    def clean(self):
+        from urllib.parse import urlsplit
+        super().clean()
+        if self.enabled:
+            missing = {field: 'Complete este dato para activar los envíos.'
+                       for field in ['host', 'username', 'from_email', 'public_url'] if not getattr(self, field)}
+            if not self.password_ciphertext:
+                missing['enabled'] = 'Ingrese una contraseña SMTP antes de activar los envíos.'
+            if missing:
+                raise ValidationError(missing)
+        if self.host and any(char.isspace() for char in self.host) or '://' in self.host:
+            raise ValidationError({'host': 'Ingrese solo el nombre del servidor, sin protocolo ni espacios.'})
+        if self.public_url and (urlsplit(self.public_url).scheme != 'https' or urlsplit(self.public_url).query
+                                or urlsplit(self.public_url).fragment or urlsplit(self.public_url).username):
+            raise ValidationError({'public_url': 'Ingrese la dirección HTTPS de la aplicación, sin credenciales, parámetros ni fragmentos.'})
+
+    class Meta:
+        verbose_name = 'configuración de correo'
+        verbose_name_plural = 'configuración de correo'
+        constraints = [models.CheckConstraint(condition=Q(pk=1), name='single_email_settings')]
+
+    def __str__(self):
+        return 'Notificaciones por correo'
+
+
+class EmailNotification(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pendiente'
+        SENT = 'sent', 'Enviada'
+        FAILED = 'failed', 'Fallida'
+
+    reservation = models.ForeignKey(Reservation, null=True, blank=True, related_name='email_notifications', on_delete=models.PROTECT)
+    event = models.CharField('Aviso', max_length=24)
+    dedupe_key = models.CharField(max_length=64, unique=True, editable=False)
+    recipient = models.EmailField('Destinatario')
+    subject = models.CharField('Asunto', max_length=200)
+    body = models.TextField('Mensaje')
+    status = models.CharField('Estado', max_length=12, choices=Status.choices, default=Status.PENDING, db_index=True)
+    attempts = models.PositiveSmallIntegerField('Intentos', default=0)
+    next_attempt_at = models.DateTimeField('Próximo intento', default=timezone.now, db_index=True)
+    last_error = models.CharField('Último error', max_length=200, blank=True)
+    created_at = models.DateTimeField('Creada', auto_now_add=True)
+    sent_at = models.DateTimeField('Enviada', null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        verbose_name = 'notificación por correo'
+        verbose_name_plural = 'notificaciones por correo'
