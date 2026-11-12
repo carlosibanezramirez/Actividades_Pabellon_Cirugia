@@ -1,0 +1,5 @@
+header .account-menu{position:relative;margin:0;font-size:14px}
+.account-menu>summary{padding:8px 0;font-weight:650}
+.account-menu-options{position:absolute;right:0;top:100%;z-index:30;display:flex;flex-direction:column;align-items:flex-start;gap:14px;min-width:220px;max-width:calc(100vw - 40px);padding:18px;background:white;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #18313a20}
+.account-menu-name{max-width:100%;overflow-wrap:anywhere;color:var(--muted)}
+@media(max-width:740px){.account-menu-options{position:fixed;right:20px;left:20px;top:auto;min-width:0}}
