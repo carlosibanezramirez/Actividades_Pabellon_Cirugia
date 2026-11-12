@@ -20,6 +20,7 @@ from .scheduling import availability, reserve_hours
 from .services import correct_event, create_intervention, record_event, complete_preoperative_activity
 from .occupancy_summary import weekly_occupancy_summary, active_reservations_for_day
 from .room_access import can_reserve_room
+from .medical_access import linked_doctor, medical_access, owned
 from .alarms import active_preparations, preparation_alarm
 
 
@@ -39,40 +40,8 @@ def account_home(request):
 @login_required
 @never_cache
 def doctor_agenda(request):
-    from datetime import datetime, time, timedelta
-    from django.db.models import Q
-    from .forms import WeeklySummaryForm
-    from .occupancy_summary import reservation_intervention_status
-    from django.db.models import Max
-    doctor = own_doctor(request)
-    form = WeeklySummaryForm(request.GET if request.GET else {'fecha': timezone.localdate()})
-    context = {'doctor': doctor, 'form': form}
-    if form.is_valid():
-        monday = week_start(form.cleaned_data['fecha'])
-        start = timezone.make_aware(datetime.combine(monday, time.min))
-        end = timezone.make_aware(datetime.combine(monday + timedelta(days=7), time.min))
-        bookings = Reservation.objects.filter(doctor=doctor).filter(
-            Q(starts_at__lt=end, ends_at__gt=start) |
-            Q(needs_rescheduling=True, original_starts_at__lt=end, original_ends_at__gt=start)
-        ).select_related('room', 'intervention').annotate(last_stage=Max('intervention__events__stage')).order_by('starts_at', 'pk')
-        for booking in bookings:
-            booking.agenda_status = ('Cancelada' if booking.cancelled_at else 'Pendiente de reprogramación' if booking.needs_rescheduling
-                                     else reservation_intervention_status(booking))
-        unreserved = Intervention.objects.filter(doctor=doctor, reservation__isnull=True,
-            created_at__gte=start, created_at__lt=end).select_related('room', 'procedure')
-        days = []
-        for offset in range(7):
-            day = monday + timedelta(days=offset)
-            day_start = timezone.make_aware(datetime.combine(day, time.min))
-            day_end = timezone.make_aware(datetime.combine(day + timedelta(days=1), time.min))
-            days.append({'date': day, 'bookings': [b for b in bookings if
-                (b.original_starts_at if b.needs_rescheduling else b.starts_at) < day_end and
-                (b.original_ends_at if b.needs_rescheduling else b.ends_at) > day_start],
-                'unreserved': [i for i in unreserved if day_start <= i.created_at < day_end]})
-        context.update(days=days, monday=monday, sunday=monday + timedelta(days=6),
-            previous_query=urlencode({'fecha': (monday - timedelta(days=7)).isoformat()}),
-            next_query=urlencode({'fecha': (monday + timedelta(days=7)).isoformat()}))
-    return render(request, 'theatre/doctor_agenda.html', context)
+    own_doctor(request)
+    return weekly_agenda(request)
 
 
 @login_required
@@ -96,7 +65,7 @@ def doctor_intervention(request, pk):
 @login_required
 @never_cache
 def notification_reservation(request, pk):
-    if request.user.has_perm('theatre.operate_intervention'):
+    if not linked_doctor(request.user) and request.user.has_perm('theatre.operate_intervention'):
         return redirect('reservation_detail', pk=pk)
     doctor = own_doctor(request)
     get_object_or_404(Reservation, doctor=doctor, pk=pk)
@@ -104,7 +73,7 @@ def notification_reservation(request, pk):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @never_cache
 def reservation_start_times(request):
     from .start_times import start_times_for_day
@@ -115,16 +84,23 @@ def reservation_start_times(request):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @never_cache
 def open_reservations(request):
     from django.db.models import Q
     from .scheduling import day_slots
-    form = OpenReservationFilterForm(request.GET if request.GET else {'fecha': timezone.localdate()})
+    doctor = linked_doctor(request.user)
+    params = request.GET.copy()
+    if doctor or not params:
+        params['fecha'] = timezone.localdate().isoformat()
+    form = OpenReservationFilterForm(params)
+    if doctor:
+        form.fields['fecha'].disabled = True
+        form.fields['fecha'].initial = timezone.localdate()
     rows = []
     if form.is_valid():
         slots = day_slots(form.cleaned_data['fecha'])
-        bookings = Reservation.objects.filter(cancelled_at__isnull=True,
+        bookings = owned(Reservation.objects.all(), request.user).filter(cancelled_at__isnull=True,
             starts_at__lt=slots[-1]['end'], ends_at__gt=slots[0]['start'],
         ).select_related('room', 'doctor', 'procedure', 'intervention').order_by('starts_at', 'pk')
         if form.cleaned_data['room']:
@@ -147,10 +123,10 @@ def open_reservations(request):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @never_cache
 def open_reservation(request, pk):
-    booking = get_object_or_404(Reservation.objects.select_related('room', 'doctor', 'procedure', 'intervention'), pk=pk)
+    booking = get_object_or_404(owned(Reservation.objects.select_related('room', 'doctor', 'procedure', 'intervention'), request.user), pk=pk)
     intervention = getattr(booking, 'intervention', None)
     if intervention:
         return redirect('detail', pk=intervention.pk)
@@ -254,21 +230,22 @@ def reservation_search(request):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @never_cache
 def preparation_status(request):
-    return JsonResponse(active_preparations())
+    return JsonResponse(active_preparations(doctor=linked_doctor(request.user)))
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @never_cache
 def weekly_agenda(request):
     from datetime import timedelta
-    initial_room = Room.objects.first()
-    params = request.GET if request.GET else {
-        'room': initial_room.pk if initial_room else '', 'fecha': timezone.localdate().isoformat(),
-    }
+    doctor = linked_doctor(request.user)
+    initial_room = Room.objects.filter(reservation__doctor=doctor).first() if doctor else Room.objects.first()
+    initial_room = initial_room or Room.objects.first()
+    params = {'room': initial_room.pk if initial_room else '', 'fecha': timezone.localdate().isoformat()}
+    params.update(request.GET.dict())
     form = WeeklyAgendaForm(params)
     context = {'form': form}
     if form.is_valid():
@@ -277,7 +254,7 @@ def weekly_agenda(request):
         policy = OperatingSettings.current()
         context.update({
             'room': room, 'monday': monday, 'sunday': monday + timedelta(days=6),
-            'days': [continuous_day(room, monday + timedelta(days=i), policy=policy) for i in range(7)],
+            'days': [continuous_day(room, monday + timedelta(days=i), policy=policy, doctor=doctor) for i in range(7)],
             'policy': policy,
             'previous_query': urlencode({'room': room.pk, 'fecha': (monday - timedelta(days=7)).isoformat()}),
             'next_query': urlencode({'room': room.pk, 'fecha': (monday + timedelta(days=7)).isoformat()}),
@@ -324,7 +301,7 @@ def day_reservations(request, room_id, day_string):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @never_cache
 def weekly_day(request, room_id, day_string):
     from datetime import date
@@ -335,11 +312,16 @@ def weekly_day(request, room_id, day_string):
             raise ValueError
     except ValueError:
         raise Http404('Fecha no válida')
-    day_data = continuous_day(room, day)
+    doctor = linked_doctor(request.user)
+    day_data = continuous_day(room, day, doctor=doctor)
     allowed = [option['value'] for option in day_data['start_options']]
     suggested = request.GET.get('inicio', '')
     initial = {'desired_time': suggested} if suggested in allowed else {}
     form = ContinuousReservationForm(request.POST or None, initial=initial, allowed_times=allowed)
+    if doctor:
+        form.fields['doctor'].queryset = Doctor.objects.filter(pk=doctor.pk)
+        form.fields['doctor'].initial = doctor
+        form.fields['doctor'].disabled = True
     if request.method == 'POST' and form.is_valid():
         try:
             booking = reserve_continuous(user=request.user, room=room, day=day, **form.cleaned_data)
@@ -399,7 +381,7 @@ def agenda(request):
 @login_required
 @never_cache
 def reservation_detail(request, pk):
-    if not request.user.has_perm('theatre.operate_intervention'):
+    if linked_doctor(request.user) or not request.user.has_perm('theatre.operate_intervention'):
         doctor = own_doctor(request)
         get_object_or_404(Reservation, pk=pk, doctor=doctor)
         return redirect('doctor_reservation', pk=pk)
@@ -411,10 +393,10 @@ def reservation_detail(request, pk):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @never_cache
 def reservation_edit(request, pk):
-    booking = get_object_or_404(Reservation.objects.select_related('room', 'procedure', 'doctor'), pk=pk)
+    booking = get_object_or_404(owned(Reservation.objects.select_related('room', 'procedure', 'doctor'), request.user), pk=pk)
     planned = timezone.localtime(booking.planned_start_at or booking.starts_at)
     initial = {'room': booking.room_id, 'fecha': planned.date(), 'desired_time': planned.strftime('%H:%M'),
                'revision': signing.dumps(reservation_revision(booking), salt='reservation-edit')}
@@ -445,11 +427,11 @@ def reservation_edit(request, pk):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @require_POST
 @never_cache
 def reservation_cancel(request, pk):
-    booking = get_object_or_404(Reservation.objects.select_related('room', 'doctor', 'procedure'), pk=pk)
+    booking = get_object_or_404(owned(Reservation.objects.select_related('room', 'doctor', 'procedure'), request.user), pk=pk)
     form = CancelReservationForm(request.POST, prefix='cancellation')
     if form.is_valid():
         try:
@@ -540,10 +522,10 @@ def create(request):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @never_cache
 def detail(request, pk, history=False):
-    intervention = get_object_or_404(Intervention.objects.select_related('room', 'procedure', 'doctor', 'anesthetist', 'created_by', 'reservation'), pk=pk)
+    intervention = get_object_or_404(owned(Intervention.objects.select_related('room', 'procedure', 'doctor', 'anesthetist', 'created_by', 'reservation'), request.user), pk=pk)
     events = list(intervention.events.select_related('recorded_by').prefetch_related('corrections__corrected_by'))
     by_stage = {e.stage: e for e in events}
     preoperative = {activity.kind: activity for activity in intervention.preoperative_activities.select_related('completed_by')}
@@ -577,10 +559,10 @@ def detail(request, pk, history=False):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @require_POST
 def record(request, pk, stage):
-    get_object_or_404(Intervention, pk=pk)
+    get_object_or_404(owned(Intervention.objects.all(), request.user), pk=pk)
     try:
         record_event(user=request.user, intervention_id=pk, stage=stage)
     except (ValidationError, IntegrityError) as exc:
@@ -592,10 +574,10 @@ def record(request, pk, stage):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
+@medical_access
 @require_POST
 def complete_preoperative(request, pk, kind):
-    get_object_or_404(Intervention, pk=pk)
+    get_object_or_404(owned(Intervention.objects.all(), request.user), pk=pk)
     try:
         complete_preoperative_activity(user=request.user, intervention_id=pk, kind=kind)
     except (ValidationError, IntegrityError) as error:

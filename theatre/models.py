@@ -106,6 +106,9 @@ class Doctor(Catalog):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, verbose_name='Cuenta de acceso del médico',
                                 related_name='doctor_profile', null=True, blank=True, on_delete=models.PROTECT)
     email = models.EmailField('Correo electrónico', blank=True)
+    mobile_phone = models.CharField('Teléfono móvil (SMS y WhatsApp)', max_length=30, blank=True,
+                                    help_text='Incluya el código de país, por ejemplo +56912345678.')
+    alternate_phone = models.CharField('Teléfono alternativo', max_length=30, blank=True)
     specialty = models.ForeignKey(
         Specialty, verbose_name='Especialidad', on_delete=models.PROTECT,
         blank=True, null=True,

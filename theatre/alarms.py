@@ -19,13 +19,15 @@ def preparation_alarm(room_id, intervention_id, started_at, stage, maximum, now)
     }
 
 
-def active_preparations():
+def active_preparations(doctor=None):
     policy = OperatingSettings.current()
     now = timezone.now()
     start = Event.objects.filter(intervention_id=OuterRef('pk'), stage=Event.Stage.ROOM_START).values('occurred_at')[:1]
     rows = Intervention.objects.filter(completed_at__isnull=True).annotate(
         stage=Max('events__stage'), started=Subquery(start),
     ).filter(stage=Event.Stage.ROOM_START)
+    if doctor:
+        rows = rows.filter(doctor=doctor)
     return {
         'now': now.isoformat(), 'maximum_minutes': policy.preparation_max_minutes,
         'active': [{'room_id': item.room_id, 'intervention_id': item.pk, 'started_at': item.started.isoformat()}

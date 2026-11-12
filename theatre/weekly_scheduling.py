@@ -8,7 +8,7 @@ from django.utils import timezone
 from .models import Doctor, OperatingSettings, Procedure, Reservation, Room
 from .operating import booking_window, validate_booking_window
 from .scheduling import day_slots, occupancy
-from .services import require_permission
+from .medical_access import require_medical_access
 from .rut import normalize_rut
 from .room_access import require_room_booking_access
 
@@ -71,7 +71,7 @@ def available_starts(room, day, now=None, periods=None, policy=None):
     return options
 
 
-def continuous_day(room, day, now=None, policy=None):
+def continuous_day(room, day, now=None, policy=None, doctor=None):
     now = now or timezone.now()
     policy = policy or OperatingSettings.current()
     opening, closing = booking_window(day, room)
@@ -137,6 +137,8 @@ def continuous_day(room, day, now=None, policy=None):
             chained = [option for option in candidates if option['previous']]
             segment['suggested_time'] = chained[0]['value'] if chained else ''
             segment['has_start'] = bool(candidates)
+    if doctor:
+        bookings = {pk: booking for pk, booking in bookings.items() if booking.doctor_id == doctor.pk}
     for booking in sorted(bookings.values(), key=lambda item: (item.starts_at, item.pk)):
         left, right = max(start, booking.starts_at), min(end, booking.ends_at)
         if left < right:
@@ -182,7 +184,7 @@ def continuous_day(room, day, now=None, policy=None):
         'bookings': sorted(bookings.values(), key=lambda booking: (booking.starts_at, booking.pk)),
         'booking_blocks': blocks,
         'displaced_bookings': Reservation.objects.filter(room=room, needs_rescheduling=True, cancelled_at__isnull=True,
-            original_starts_at__lt=end, original_ends_at__gt=start),
+            original_starts_at__lt=end, original_ends_at__gt=start).filter(**({'doctor': doctor} if doctor else {})),
         'start_options': options,
         'policy': policy,
     }
@@ -190,7 +192,7 @@ def continuous_day(room, day, now=None, policy=None):
 
 @transaction.atomic
 def reserve_continuous(*, user, room, day, desired_time, duration_minutes, doctor, procedure, patient_name, patient_rut='', diagnosis='', expected_preparation_minutes=None, automatic=False):
-    require_permission(user, 'theatre.operate_intervention')
+    require_medical_access(user, doctor.pk)
     patient_rut = normalize_rut(patient_rut)
     if not 1900 <= day.year <= 9997:
         raise ValidationError('Seleccione una fecha entre los años 1900 y 9997.')
@@ -254,7 +256,7 @@ def reservation_revision(booking):
 
 @transaction.atomic
 def reschedule_reservation(*, user, reservation_id, room, day, desired_time, expected_revision):
-    require_permission(user, 'theatre.operate_intervention')
+    require_medical_access(user, Reservation.objects.get(pk=reservation_id).doctor_id)
     if not 1900 <= day.year <= 9997:
         raise ValidationError('Seleccione una fecha entre los años 1900 y 9997.')
     if desired_time.minute not in (0, 30) or desired_time.second or desired_time.microsecond or desired_time.tzinfo:
@@ -306,7 +308,7 @@ def reschedule_reservation(*, user, reservation_id, room, day, desired_time, exp
 
 @transaction.atomic
 def cancel_reservation(*, user, reservation_id, reason, expected_revision):
-    require_permission(user, 'theatre.operate_intervention')
+    require_medical_access(user, Reservation.objects.get(pk=reservation_id).doctor_id)
     old_room_id = Reservation.objects.values_list('room_id', flat=True).get(pk=reservation_id)
     Room.objects.select_for_update().get(pk=old_room_id)
     booking = Reservation.objects.select_for_update().get(pk=reservation_id)
