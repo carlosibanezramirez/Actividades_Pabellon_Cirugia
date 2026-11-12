@@ -103,6 +103,8 @@ class Specialty(Catalog):
 
 
 class Doctor(Catalog):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, verbose_name='Cuenta de acceso del médico',
+                                related_name='doctor_profile', null=True, blank=True, on_delete=models.PROTECT)
     email = models.EmailField('Correo electrónico', blank=True)
     specialty = models.ForeignKey(
         Specialty, verbose_name='Especialidad', on_delete=models.PROTECT,
@@ -112,6 +114,7 @@ class Doctor(Catalog):
     class Meta(Catalog.Meta):
         verbose_name = 'médico'
         verbose_name_plural = 'médicos'
+        permissions = [('view_own_agenda', 'Puede consultar su propia agenda médica')]
 
 
 class CancellationReason(Catalog):
@@ -129,7 +132,7 @@ class Reservation(models.Model):
     diagnosis = models.TextField('Diagnóstico', blank=True, default='')
     starts_at = models.DateTimeField('Inicio reservado', db_index=True)
     ends_at = models.DateTimeField('Término reservado', db_index=True)
-    planned_start_at = models.DateTimeField('Inicio solicitado (preparación de anestesia)', null=True, blank=True)
+    planned_start_at = models.DateTimeField('Inicio solicitado (preparación de anestesia)', null=True, blank=True, db_index=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -317,6 +320,9 @@ class EmailSettings(models.Model):
     from_email = models.EmailField('Correo remitente', blank=True)
     from_name = models.CharField('Nombre del remitente', max_length=120, default='Surgeon — Gestión de Pabellones')
     public_url = models.URLField('Dirección HTTPS de la aplicación', blank=True)
+    notify_reminder = models.BooleanField('Recordatorio de asistencia al médico', default=True)
+    reminder_minutes = models.PositiveIntegerField('Anticipación del recordatorio (minutos)', default=180,
+        validators=[MinValueValidator(1), MaxValueValidator(1440)])
     notify_confirmed = models.BooleanField('Reserva confirmada', default=True)
     notify_modified = models.BooleanField('Reserva modificada', default=True)
     notify_cancelled = models.BooleanField('Reserva cancelada', default=True)
@@ -364,7 +370,8 @@ class EmailSettings(models.Model):
     class Meta:
         verbose_name = 'configuración de correo'
         verbose_name_plural = 'configuración de correo'
-        constraints = [models.CheckConstraint(condition=Q(pk=1), name='single_email_settings')]
+        constraints = [models.CheckConstraint(condition=Q(pk=1), name='single_email_settings'),
+                       models.CheckConstraint(condition=Q(reminder_minutes__gte=1, reminder_minutes__lte=1440), name='valid_reminder_minutes')]
 
     def __str__(self):
         return 'Notificaciones por correo'
@@ -375,10 +382,12 @@ class EmailNotification(models.Model):
         PENDING = 'pending', 'Pendiente'
         SENT = 'sent', 'Enviada'
         FAILED = 'failed', 'Fallida'
+        SKIPPED = 'skipped', 'Omitida'
 
     reservation = models.ForeignKey(Reservation, null=True, blank=True, related_name='email_notifications', on_delete=models.PROTECT)
     event = models.CharField('Aviso', max_length=24)
     dedupe_key = models.CharField(max_length=64, unique=True, editable=False)
+    scheduled_start_at = models.DateTimeField('Inicio programado al crear el recordatorio', null=True, blank=True)
     recipient = models.EmailField('Destinatario')
     subject = models.CharField('Asunto', max_length=200)
     body = models.TextField('Mensaje')

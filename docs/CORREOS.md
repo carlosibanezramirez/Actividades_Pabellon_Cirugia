@@ -16,11 +16,11 @@ La migración 0021 conserva STARTTLS explícito para las configuraciones existen
 
 ## Destinatarios y avisos
 
-Los destinatarios son el correo del cirujano de la reserva, el usuario activo que la creó y los usuarios activos del grupo Administrador o superusuarios. Se omiten direcciones vacías/inválidas y se deduplican sin distinguir mayúsculas. Cada destinatario recibe un mensaje separado.
+Los destinatarios son el correo del cirujano de la reserva (o el de su cuenta activa vinculada si el primero está vacío), el usuario activo que la creó y los usuarios activos del grupo Administrador o superusuarios. Se omiten direcciones vacías/inválidas y se deduplican sin distinguir mayúsculas. Cada destinatario recibe un mensaje separado.
 
 Se notifican confirmación, modificación manual, cancelación, reasignación automática por alargue y reserva sin tiempo útil pendiente de reprogramación. Los ajustes automáticos por salida del paciente generan modificación o pendiente de reprogramación, según corresponda. El mensaje incluye referencia de reserva, pabellón, horarios y enlace autenticado; no incluye nombre del paciente, RUT, diagnóstico ni operación. El motivo detallado de una cancelación se consulta dentro de la aplicación.
 
-Solo se encolan eventos nuevos mientras las notificaciones y su tipo estén habilitados. No hay envío retroactivo de reservas anteriores. Desactivar globalmente los correos pausa también la entrega de lo ya encolado; los interruptores de cada tipo afectan a los eventos nuevos.
+Solo se encolan eventos nuevos mientras las notificaciones y su tipo estén habilitados. No hay envío retroactivo de estos eventos en reservas anteriores. Los recordatorios de asistencia sí consideran las reservas próximas existentes; ver [Agenda del médico](AGENDA_MEDICO.md). Desactivar globalmente los correos pausa también la entrega de lo ya encolado; los interruptores de cada tipo afectan a los eventos nuevos.
 
 ## Entrega y recuperación
 

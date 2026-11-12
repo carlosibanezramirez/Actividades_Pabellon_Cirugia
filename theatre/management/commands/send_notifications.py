@@ -4,6 +4,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import close_old_connections
 
 from theatre.email_delivery import deliver_pending
+from theatre.reminders import queue_reminders
 
 
 class Command(BaseCommand):
@@ -20,6 +21,7 @@ class Command(BaseCommand):
             if not options['once']:
                 close_old_connections()
             try:
+                queue_reminders()
                 count = deliver_pending()
                 if count or options['once']:
                     self.stdout.write(f'Notificaciones procesadas: {count}')

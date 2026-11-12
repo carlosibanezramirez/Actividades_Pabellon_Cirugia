@@ -61,7 +61,7 @@ STORAGES = {
 }
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'interventions'
+LOGIN_REDIRECT_URL = 'account_home'
 LOGOUT_REDIRECT_URL = 'login'
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_AGE = 28800

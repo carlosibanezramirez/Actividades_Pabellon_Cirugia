@@ -17,13 +17,23 @@ LABELS = {
 }
 
 
+def doctor_email(doctor):
+    address = doctor.email or (doctor.user.email if doctor.user_id and doctor.user.is_active else '')
+    address = address.strip().lower()
+    try:
+        validate_email(address)
+    except ValidationError:
+        return ''
+    return address
+
+
 def recipient_addresses(booking):
     administrators = get_user_model().objects.filter(is_active=True).filter(
         Q(is_superuser=True) | Q(groups__name='Administrador'),
     ).exclude(email='').values_list('email', flat=True).distinct()
     doctor = Doctor.objects.get(pk=booking.doctor_id)
     creator = get_user_model().objects.get(pk=booking.created_by_id)
-    addresses = [doctor.email, creator.email if creator.is_active else '', *administrators]
+    addresses = [doctor_email(doctor), creator.email if creator.is_active else '', *administrators]
     valid = set()
     for address in addresses:
         address = address.strip().lower()
@@ -57,7 +67,7 @@ def queue_reservation_notification(booking, event, *, event_key=None, previous_s
     if event == 'reschedule':
         body += '\nLa reserva quedó sin tiempo útil por un atraso previo y debe reprogramarse.\n'
     body += '\nConsulte los detalles en la aplicación (requiere iniciar sesión):\n'
-    body += config.public_url.rstrip('/') + reverse('reservation_detail', args=[booking.pk])
+    body += config.public_url.rstrip('/') + reverse('notification_reservation', args=[booking.pk])
     key = event_key or uuid.uuid4().hex
     queued = 0
     for address in recipient_addresses(booking):

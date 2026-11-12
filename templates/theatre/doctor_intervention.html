@@ -1,0 +1,5 @@
+{% extends 'base.html' %}{% block content %}
+<a href="{% url 'doctor_agenda' %}">← Mi agenda</a><h1>{{ intervention.procedure }}</h1><p>{{ intervention.room }} · {% if intervention.completed_at %}Finalizada{% else %}En curso{% endif %}</p>
+{% if intervention.reservation %}<p>Paciente: {{ intervention.reservation.patient_name }}</p>{% endif %}<p>Anestesista: {{ intervention.anesthetist|default:'No registrado' }}</p>
+<h2>Preoperatorio</h2>{% for activity in preoperative %}<article class="card"><h3>{{ activity.get_kind_display }}</h3><p>{{ activity.completed_at|date:'d/m/Y H:i:s' }}</p></article>{% empty %}<p>Sin actividades registradas.</p>{% endfor %}
+<h2>Eventos cirugía</h2>{% for event in events %}<article class="card"><h3>{{ event.get_stage_display }}</h3><p>{{ event.occurred_at|date:'d/m/Y H:i:s' }}</p></article>{% empty %}<p>Sin eventos registrados.</p>{% endfor %}{% endblock %}
