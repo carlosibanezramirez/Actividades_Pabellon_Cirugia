@@ -4,13 +4,15 @@
 
 Después de aplicar la migración 0020 y ejecutar `setup_roles`, un usuario del perfil Administrador con acceso al panel o un superusuario puede abrir **Configuración de correo** y crear la configuración única.
 
-Configurar servidor SMTP, puerto (587 por defecto), usuario, contraseña, dirección y nombre del remitente, y dirección HTTPS de la aplicación. El transporte utiliza **STARTTLS**, autenticación y verificación de certificados. La dirección de la aplicación debe corresponder al sitio web, que puede tener un dominio diferente al correo remitente.
+Configurar servidor SMTP, puerto (587 por defecto), usuario, contraseña, dirección y nombre del remitente, y dirección HTTPS de la aplicación. El transporte usa el tipo de conexión elegido: automático por puerto (587 STARTTLS, 465 TLS/SSL implícito, 25 sin SSL/TLS) o selección explícita de STARTTLS, TLS/SSL o sin cifrado. Para puertos no estándar se debe seleccionar el tipo explícitamente. STARTTLS y TLS verifican los certificados y no se degradan a una conexión sin cifrado si fallan. La dirección de la aplicación debe corresponder al sitio web, que puede tener un dominio diferente al correo remitente.
 
 La contraseña se ingresa únicamente en Administración. Se almacena cifrada con Fernet y no se vuelve a precargar, mostrar ni registrar en los mensajes de error. Dejar el campo vacío conserva la contraseña; escribir otra la reemplaza. La clave de cifrado se deriva de `SMTP_CREDENTIAL_KEY` o, si está vacío, de `DJANGO_SECRET_KEY`. Todos los servicios deben compartir esa clave. Conservarla junto al respaldo de configuración: al cambiarla hay que volver a ingresar la contraseña SMTP. Las credenciales y claves no se guardan en GitHub.
 
 Completar **Correo electrónico** de los médicos en **Médicos** y de las cuentas en **Usuarios**. Las cuentas de usuarios ya disponían de ese campo; ahora se muestra también en el listado y en el formulario de alta. Los médicos incorporan un campo nuevo. Ambos admiten campos vacíos para conservar cuentas existentes, pero sin dirección no recibirán mensajes.
 
 Marcar **Activar notificaciones por correo** y los tipos de aviso deseados. El botón **Enviar prueba a mi correo** encola una prueba para la cuenta del administrador conectado. Ver su resultado en **Notificaciones por correo**. Esta prueba utiliza la configuración guardada; no guarda cambios pendientes del formulario.
+
+La migración 0021 conserva STARTTLS explícito para las configuraciones existentes, sin cambiar sus credenciales. Al cambiar el puerto en Administración se sugiere automáticamente su tipo y se muestra junto al selector; se puede sobrescribir para configuraciones particulares.
 
 ## Destinatarios y avisos
 

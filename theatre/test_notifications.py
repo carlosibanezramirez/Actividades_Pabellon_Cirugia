@@ -47,7 +47,7 @@ class NotificationTests(TestCase):
         return reserve_continuous(**data)
 
     def config_data(self, **overrides):
-        data = dict(host='smtp.example.test', port=587, username='smtp-user', enabled='on',
+        data = dict(host='smtp.example.test', port=587, connection_type='auto', username='smtp-user', enabled='on',
                     from_email='notice@example.test', from_name='Surgeon', public_url='https://app.example.test',
                     notify_confirmed='on', notify_modified='on', notify_cancelled='on', notify_relocated='on', notify_reschedule='on')
         data.update(overrides)
@@ -164,6 +164,21 @@ class NotificationTests(TestCase):
         self.assertFalse(get.call_args.kwargs['use_ssl'])
         self.assertEqual(get.call_args.kwargs['password'], 'fictional-smtp-password')
         self.assertEqual(get.call_args.kwargs['timeout'], 15)
+
+    def test_connection_modes_follow_port_or_explicit_selection(self):
+        from .email_delivery import smtp_connection
+        for port, mode, tls, ssl in [(587, 'auto', True, False), (465, 'auto', False, True),
+                                     (25, 'auto', False, False), (2525, 'starttls', True, False),
+                                     (587, 'plain', False, False), (2525, 'tls', False, True)]:
+            with self.subTest(port=port, mode=mode):
+                self.config.port, self.config.connection_type = port, mode
+                with patch('theatre.email_delivery.get_connection') as connection:
+                    smtp_connection(self.config)
+                self.assertEqual(connection.call_args.kwargs['use_tls'], tls)
+                self.assertEqual(connection.call_args.kwargs['use_ssl'], ssl)
+        form = EmailSettingsForm(data=self.config_data(port=2525, connection_type='auto'), instance=self.config)
+        self.assertFalse(form.is_valid())
+        self.assertIn('connection_type', form.errors)
 
     def test_failure_retries_then_marks_failed_without_logging_credentials(self):
         self.booking()

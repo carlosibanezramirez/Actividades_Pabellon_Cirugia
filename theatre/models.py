@@ -299,12 +299,20 @@ class Correction(models.Model):
 
 
 class EmailSettings(models.Model):
+    class ConnectionType(models.TextChoices):
+        AUTO = 'auto', 'Automático según puerto'
+        STARTTLS = 'starttls', 'STARTTLS'
+        TLS = 'tls', 'TLS / SSL implícito'
+        PLAIN = 'plain', 'Sin SSL/TLS (sin cifrado)'
+
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
     enabled = models.BooleanField('Activar notificaciones por correo', default=False)
-    host = models.CharField('Servidor SMTP', max_length=253, blank=True)
-    port = models.PositiveIntegerField('Puerto SMTP (STARTTLS)', default=587,
+    host = models.CharField('Servidor de correos (FQDN)', max_length=253, blank=True)
+    port = models.PositiveIntegerField('Puerto SMTP', default=587,
                                        validators=[MinValueValidator(1), MaxValueValidator(65535)])
-    username = models.CharField('Usuario SMTP', max_length=254, blank=True)
+    connection_type = models.CharField('Tipo de conexión', max_length=12, choices=ConnectionType.choices, default=ConnectionType.AUTO,
+                                       help_text='Automático: 587 STARTTLS, 465 TLS/SSL, 25 sin SSL/TLS. Para otro puerto, seleccione el tipo de conexión.')
+    username = models.CharField('Usuario (casilla de notificaciones)', max_length=254, blank=True)
     password_ciphertext = models.TextField(editable=False, blank=True)
     from_email = models.EmailField('Correo remitente', blank=True)
     from_name = models.CharField('Nombre del remitente', max_length=120, default='Surgeon — Gestión de Pabellones')
@@ -315,6 +323,17 @@ class EmailSettings(models.Model):
     notify_relocated = models.BooleanField('Reasignación automática', default=True)
     notify_reschedule = models.BooleanField('Pendiente de reprogramación', default=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def resolved_connection_type(self):
+        if self.connection_type not in self.ConnectionType.values:
+            raise ValueError('Tipo de conexión SMTP no válido.')
+        if self.connection_type != self.ConnectionType.AUTO:
+            return self.connection_type
+        modes = {587: self.ConnectionType.STARTTLS, 465: self.ConnectionType.TLS, 25: self.ConnectionType.PLAIN}
+        if self.port not in modes:
+            raise ValueError('Seleccione un tipo de conexión para este puerto no estándar.')
+        return modes[self.port]
 
     def set_password(self, value):
         from .smtp_credentials import encrypt_password
@@ -327,6 +346,8 @@ class EmailSettings(models.Model):
     def clean(self):
         from urllib.parse import urlsplit
         super().clean()
+        if self.connection_type == self.ConnectionType.AUTO and self.port not in (25, 465, 587):
+            raise ValidationError({'connection_type': 'Para un puerto no estándar, seleccione explícitamente el tipo de conexión.'})
         if self.enabled:
             missing = {field: 'Complete este dato para activar los envíos.'
                        for field in ['host', 'username', 'from_email', 'public_url'] if not getattr(self, field)}
