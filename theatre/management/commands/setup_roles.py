@@ -1,4 +1,5 @@
 from django.contrib.auth.models import Group, Permission
+from django.db.models import Q
 from django.core.management.base import BaseCommand
 
 
@@ -17,5 +18,8 @@ class Command(BaseCommand):
             codename__in=['view_operatingsettings', 'change_operatingsettings'],
         )
         relocations = Permission.objects.filter(content_type__app_label='theatre', codename='view_automaticrelocation')
-        administrator.permissions.set([operate, correct, *catalog, *settings_permissions, *relocations])
+        mail_permissions = Permission.objects.filter(content_type__app_label='theatre').filter(
+            Q(content_type__model='emailsettings', codename__in=['add_emailsettings', 'view_emailsettings', 'change_emailsettings'])
+            | Q(codename='view_emailnotification'))
+        administrator.permissions.set([operate, correct, *catalog, *settings_permissions, *relocations, *mail_permissions])
         self.stdout.write(self.style.SUCCESS('Perfiles preparados. Asigne los usuarios desde Administración.'))

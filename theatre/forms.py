@@ -2,7 +2,7 @@ from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group
-from .models import CancellationReason, Doctor, Intervention, Procedure, Reservation, Room
+from .models import EmailSettings, CancellationReason, Doctor, Intervention, Procedure, Reservation, Room
 from .rut import normalize_rut
 
 
@@ -24,10 +24,12 @@ def profile_field():
 
 
 class ProfileUserCreationForm(AdminUserCreationForm):
+    email = forms.EmailField(label='Correo electrónico', required=False)
     groups = profile_field()
 
 
 class ProfileUserChangeForm(UserChangeForm):
+    email = forms.EmailField(label='Correo electrónico', required=False)
     groups = profile_field()
 
 
@@ -228,3 +230,19 @@ class OpenReservationFilterForm(AgendaDateForm):
 
 class StartReservedInterventionForm(forms.Form):
     anesthetist = forms.ModelChoiceField(label='Anestesista', queryset=eligible_anesthetists())
+
+
+class EmailSettingsForm(forms.ModelForm):
+    smtp_password = forms.CharField(label='Contraseña SMTP', required=False, strip=False,
+                                   widget=forms.PasswordInput(render_value=False),
+                                   help_text='Déjela vacía para conservar la contraseña guardada.')
+
+    class Meta:
+        model = EmailSettings
+        exclude = ['password_ciphertext']
+
+    def clean(self):
+        data = super().clean()
+        if data.get('smtp_password'):
+            self.instance.set_password(data['smtp_password'])
+        return data

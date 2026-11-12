@@ -223,10 +223,13 @@ def reserve_continuous(*, user, room, day, desired_time, duration_minutes, docto
     if not Doctor.objects.filter(pk=doctor.pk, active=True).exists() or not Procedure.objects.filter(pk=procedure.pk, active=True).exists():
         raise ValidationError('Seleccione un médico y un tipo de cirugía activos.')
     validate_reservation_space(locked_room, day, planned, start, end, now, policy.preparation_mean_minutes)
-    return Reservation.objects.create(
+    booking = Reservation.objects.create(
         room=locked_room, doctor=doctor, procedure=procedure, patient_name=patient_name, patient_rut=patient_rut,
         starts_at=start, planned_start_at=planned, ends_at=end, created_by=user, diagnosis=diagnosis,
     )
+    from .notifications import queue_reservation_notification
+    queue_reservation_notification(booking, 'confirmed', event_key=f'created:{booking.pk}')
+    return booking
 
 
 def validate_reservation_space(room, day, planned, start, end, now, preparation_minutes, exclude_id=None):
@@ -275,6 +278,8 @@ def reschedule_reservation(*, user, reservation_id, room, day, desired_time, exp
         raise ValidationError('El pabellón no está disponible.')
     require_room_booking_access(user, rooms[old_room_id])
     require_room_booking_access(user, destination)
+    from .notifications import reservation_summary, queue_reservation_notification
+    previous_summary = reservation_summary(booking)
     restore = booking.timing_adjusted and booking.original_starts_at is not None
     base_start = booking.original_starts_at if restore else booking.starts_at
     base_planned = (booking.original_planned_start_at if restore else booking.planned_start_at) or base_start
@@ -294,6 +299,8 @@ def reschedule_reservation(*, user, reservation_id, room, day, desired_time, exp
     booking.timing_adjusted = False
     booking.original_starts_at = booking.original_planned_start_at = booking.original_ends_at = None
     booking.save()
+    if previous_summary != reservation_summary(booking):
+        queue_reservation_notification(booking, 'modified', previous_summary=previous_summary)
     return booking
 
 
@@ -318,6 +325,8 @@ def cancel_reservation(*, user, reservation_id, reason, expected_revision):
     booking.cancellation_reason = cause
     booking.cancellation_reason_name = cause.name
     booking.save(update_fields=['cancelled_at', 'cancelled_by', 'cancellation_reason', 'cancellation_reason_name'])
+    from .notifications import queue_reservation_notification
+    queue_reservation_notification(booking, 'cancelled', event_key=f'cancelled:{booking.pk}')
     return booking
 
 
