@@ -142,12 +142,15 @@ class EmailSettingsAdmin(admin.ModelAdmin):
     form = EmailSettingsForm
     change_form_template = 'admin/theatre/emailsettings/change_form.html'
     fieldsets = [
-        ('Envío SMTP con STARTTLS', {'fields': ['enabled', 'host', 'port', 'username', 'smtp_password', 'password_saved']}),
+        ('Conexión con el servicio de correos', {'fields': ['enabled', 'host', 'port', 'connection_type', 'username', 'smtp_password', 'password_saved']}),
         ('Remitente y aplicación', {'fields': ['from_email', 'from_name', 'public_url']}),
         ('Avisos habilitados', {'fields': ['notify_confirmed', 'notify_modified', 'notify_cancelled',
                                           'notify_relocated', 'notify_reschedule']}),
     ]
     readonly_fields = ['password_saved']
+
+    class Media:
+        js = ('admin-smtp-connection.js',)
 
     @method_decorator(sensitive_post_parameters('smtp_password', 'username'))
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):

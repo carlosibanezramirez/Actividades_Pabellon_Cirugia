@@ -14,8 +14,10 @@ RETRY_MINUTES = (1, 5, 15, 60)
 
 
 def smtp_connection(config):
+    mode = config.resolved_connection_type
     return get_connection('django.core.mail.backends.smtp.EmailBackend', host=config.host, port=config.port,
-                          username=config.username, password=config.get_password(), use_tls=True, use_ssl=False,
+                          username=config.username, password=config.get_password(), use_tls=mode == EmailSettings.ConnectionType.STARTTLS,
+                          use_ssl=mode == EmailSettings.ConnectionType.TLS,
                           timeout=15, fail_silently=False)
 
 
