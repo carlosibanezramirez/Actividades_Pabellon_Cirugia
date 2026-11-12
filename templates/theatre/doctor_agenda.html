@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% load static %}
+{% block title %}Mi agenda · Surgeon{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'weekly-agenda.css' %}">{% endblock %}
+{% block content %}<h1>Mi agenda</h1><p>{{ doctor.name }}</p>
+<form method="get" class="card weekly-filter"><div>{{ form.fecha.label_tag }}{{ form.fecha }}{{ form.fecha.errors }}</div><button type="submit">Consultar semana</button>{{ form.non_field_errors }}</form>
+{% if days %}<div class="week-heading"><p>{{ monday|date:'d/m/Y' }} – {{ sunday|date:'d/m/Y' }}</p><nav><a href="?{{ previous_query }}">← Semana anterior</a><a href="?{{ next_query }}">Semana siguiente →</a></nav></div>
+{% for day in days %}<section style="margin-bottom:24px"><h2>{{ day.date|date:'l d/m/Y' }}</h2><div class="grid">
+{% for booking in day.bookings %}<article class="card"><h3>{{ booking.procedure }}</h3><p class="badge">{{ booking.agenda_status }}</p><p><strong>{{ booking.room }}</strong></p><p>Paciente: {{ booking.patient_name }}</p><p>{% if booking.planned_start_at %}{{ booking.planned_start_at|date:'d/m H:i' }}{% else %}{{ booking.starts_at|date:'d/m H:i' }}{% endif %} – {{ booking.ends_at|date:'d/m H:i' }}</p><a href="{% url 'doctor_reservation' booking.pk %}">Ver reserva e intervención →</a></article>{% endfor %}
+{% for item in day.unreserved %}<article class="card"><h3>{{ item.procedure }}</h3><p>{{ item.room }} · {% if item.completed_at %}Finalizada{% else %}En curso{% endif %}</p><a href="{% url 'doctor_intervention' item.pk %}">Ver intervención →</a></article>{% endfor %}
+{% if not day.bookings and not day.unreserved %}<p class="muted">Sin intervenciones para este día.</p>{% endif %}</div></section>{% endfor %}{% endif %}{% endblock %}

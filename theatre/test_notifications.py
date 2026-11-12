@@ -49,7 +49,7 @@ class NotificationTests(TestCase):
     def config_data(self, **overrides):
         data = dict(host='smtp.example.test', port=587, connection_type='auto', username='smtp-user', enabled='on',
                     from_email='notice@example.test', from_name='Surgeon', public_url='https://app.example.test',
-                    notify_confirmed='on', notify_modified='on', notify_cancelled='on', notify_relocated='on', notify_reschedule='on')
+                    notify_reminder='on', reminder_minutes=180, notify_confirmed='on', notify_modified='on', notify_cancelled='on', notify_relocated='on', notify_reschedule='on')
         data.update(overrides)
         return data
 
@@ -90,7 +90,7 @@ class NotificationTests(TestCase):
             self.assertNotIn(booking.patient_rut, notification.body)
             self.assertNotIn(booking.diagnosis, notification.body)
             self.assertNotIn(booking.procedure.name, notification.body)
-            self.assertIn('https://app.example.test/reservas/', notification.body)
+            self.assertIn('https://app.example.test/avisos/reservas/', notification.body)
         queue_reservation_notification(booking, 'confirmed', event_key=f'created:{booking.pk}')
         self.assertEqual(EmailNotification.objects.count(), 2)
 

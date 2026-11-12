@@ -1,0 +1,7 @@
+{% extends 'base.html' %}{% block content %}
+<a href="{% url 'doctor_agenda' %}?fecha={{ booking.starts_at|date:'Y-m-d' }}">← Mi agenda</a>
+<section class="card narrow"><h1>Reserva #{{ booking.pk }}</h1><h2>{{ booking.procedure }}</h2>
+{% if booking.cancelled_at %}<p class="message">Cancelada: {{ booking.cancellation_reason_name }}</p>{% elif booking.needs_rescheduling %}<p class="message error">Pendiente de reprogramación.</p>{% endif %}
+<dl><dt>Pabellón</dt><dd>{{ booking.room }}</dd><dt>Paciente</dt><dd>{{ booking.patient_name }} · RUT: {{ booking.patient_rut|default:'No registrado' }}</dd><dt>Diagnóstico</dt><dd>{{ booking.diagnosis|default:'No registrado' }}</dd><dt>Inicio programado</dt><dd>{% if booking.planned_start_at %}{{ booking.planned_start_at|date:'d/m/Y H:i' }}{% else %}{{ booking.starts_at|date:'d/m/Y H:i' }}{% endif %}</dd><dt>Preparación desde</dt><dd>{{ booking.starts_at|date:'d/m/Y H:i' }}</dd><dt>Término programado</dt><dd>{{ booking.ends_at|date:'d/m/Y H:i' }}</dd></dl>
+{% for move in booking.automatic_relocations.all %}<p class="message">Pabellón reasignado de {{ move.from_room }} a {{ move.to_room }}.</p>{% endfor %}
+{% if booking.intervention %}<a class="button" href="{% url 'doctor_intervention' booking.intervention.pk %}">Ver eventos de mi intervención</a>{% else %}<p class="muted">Aún no se ha abierto el registro de intervención.</p>{% endif %}</section>{% endblock %}

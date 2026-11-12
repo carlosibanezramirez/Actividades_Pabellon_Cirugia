@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core import signing
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.http import Http404, JsonResponse
@@ -14,13 +14,93 @@ from urllib.parse import urlencode
 from secrets import choice as choose_available_room
 from .forms import AgendaDateForm, ContinuousReservationForm, CorrectionForm, DashboardFilterForm, InterventionForm, ReservationRequestForm, WeeklyAgendaForm, WeeklySummaryForm, RescheduleReservationForm, CancelReservationForm, ReservationSearchForm, OpenReservationFilterForm, StartReservedInterventionForm
 from .dashboard import STATES, event_statistics, room_board, room_snapshot, state_links
-from .models import Event, Intervention, OperatingSettings, Reservation, Room, PreoperativeActivity
+from .models import Event, Intervention, OperatingSettings, Reservation, Room, PreoperativeActivity, Doctor
 from .weekly_scheduling import continuous_day, reserve_continuous, week_start, reschedule_reservation, reservation_revision, cancel_reservation, find_available_rooms
 from .scheduling import availability, reserve_hours
 from .services import correct_event, create_intervention, record_event, complete_preoperative_activity
 from .occupancy_summary import weekly_occupancy_summary, active_reservations_for_day
 from .room_access import can_reserve_room
 from .alarms import active_preparations, preparation_alarm
+
+
+def own_doctor(request):
+    if not request.user.has_perm('theatre.view_own_agenda'):
+        raise PermissionDenied
+    return get_object_or_404(Doctor, user=request.user, active=True)
+
+
+@login_required
+def account_home(request):
+    if request.user.has_perm('theatre.view_own_agenda') and Doctor.objects.filter(user=request.user, active=True).exists():
+        return redirect('doctor_agenda')
+    return redirect('interventions')
+
+
+@login_required
+@never_cache
+def doctor_agenda(request):
+    from datetime import datetime, time, timedelta
+    from django.db.models import Q
+    from .forms import WeeklySummaryForm
+    from .occupancy_summary import reservation_intervention_status
+    from django.db.models import Max
+    doctor = own_doctor(request)
+    form = WeeklySummaryForm(request.GET if request.GET else {'fecha': timezone.localdate()})
+    context = {'doctor': doctor, 'form': form}
+    if form.is_valid():
+        monday = week_start(form.cleaned_data['fecha'])
+        start = timezone.make_aware(datetime.combine(monday, time.min))
+        end = timezone.make_aware(datetime.combine(monday + timedelta(days=7), time.min))
+        bookings = Reservation.objects.filter(doctor=doctor).filter(
+            Q(starts_at__lt=end, ends_at__gt=start) |
+            Q(needs_rescheduling=True, original_starts_at__lt=end, original_ends_at__gt=start)
+        ).select_related('room', 'intervention').annotate(last_stage=Max('intervention__events__stage')).order_by('starts_at', 'pk')
+        for booking in bookings:
+            booking.agenda_status = ('Cancelada' if booking.cancelled_at else 'Pendiente de reprogramación' if booking.needs_rescheduling
+                                     else reservation_intervention_status(booking))
+        unreserved = Intervention.objects.filter(doctor=doctor, reservation__isnull=True,
+            created_at__gte=start, created_at__lt=end).select_related('room', 'procedure')
+        days = []
+        for offset in range(7):
+            day = monday + timedelta(days=offset)
+            day_start = timezone.make_aware(datetime.combine(day, time.min))
+            day_end = timezone.make_aware(datetime.combine(day + timedelta(days=1), time.min))
+            days.append({'date': day, 'bookings': [b for b in bookings if
+                (b.original_starts_at if b.needs_rescheduling else b.starts_at) < day_end and
+                (b.original_ends_at if b.needs_rescheduling else b.ends_at) > day_start],
+                'unreserved': [i for i in unreserved if day_start <= i.created_at < day_end]})
+        context.update(days=days, monday=monday, sunday=monday + timedelta(days=6),
+            previous_query=urlencode({'fecha': (monday - timedelta(days=7)).isoformat()}),
+            next_query=urlencode({'fecha': (monday + timedelta(days=7)).isoformat()}))
+    return render(request, 'theatre/doctor_agenda.html', context)
+
+
+@login_required
+@never_cache
+def doctor_reservation(request, pk):
+    doctor = own_doctor(request)
+    booking = get_object_or_404(Reservation.objects.select_related('room', 'procedure', 'intervention'), doctor=doctor, pk=pk)
+    return render(request, 'theatre/doctor_reservation.html', {'doctor': doctor, 'booking': booking})
+
+
+@login_required
+@never_cache
+def doctor_intervention(request, pk):
+    doctor = own_doctor(request)
+    item = get_object_or_404(Intervention.objects.select_related('room', 'procedure', 'anesthetist', 'reservation'), doctor=doctor, pk=pk)
+    return render(request, 'theatre/doctor_intervention.html', {'doctor': doctor, 'intervention': item,
+        'events': item.events.select_related('recorded_by'),
+        'preoperative': item.preoperative_activities.select_related('completed_by')})
+
+
+@login_required
+@never_cache
+def notification_reservation(request, pk):
+    if request.user.has_perm('theatre.operate_intervention'):
+        return redirect('reservation_detail', pk=pk)
+    doctor = own_doctor(request)
+    get_object_or_404(Reservation, doctor=doctor, pk=pk)
+    return redirect('doctor_reservation', pk=pk)
 
 
 @login_required
@@ -317,9 +397,12 @@ def agenda(request):
 
 
 @login_required
-@permission_required('theatre.operate_intervention', raise_exception=True)
 @never_cache
 def reservation_detail(request, pk):
+    if not request.user.has_perm('theatre.operate_intervention'):
+        doctor = own_doctor(request)
+        get_object_or_404(Reservation, pk=pk, doctor=doctor)
+        return redirect('doctor_reservation', pk=pk)
     booking = get_object_or_404(Reservation.objects.select_related('room', 'doctor', 'procedure', 'created_by', 'intervention'), pk=pk)
     return render(request, 'theatre/reservation_detail.html', {
         'booking': booking,

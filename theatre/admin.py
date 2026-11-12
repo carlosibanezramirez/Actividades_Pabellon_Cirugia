@@ -2,6 +2,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.admin import UserAdmin
 from django.db.models import Q
 from django.core.exceptions import PermissionDenied
@@ -71,10 +72,20 @@ class ProfileUserAdmin(UserAdmin):
 
 @admin.register(Doctor)
 class DoctorAdmin(CatalogAdmin):
-    list_display = ['name', 'specialty', 'email', 'active']
+    list_display = ['name', 'specialty', 'user', 'email', 'active']
     list_filter = ['active', 'specialty']
-    search_fields = ['name', 'email', 'specialty__name']
+    search_fields = ['name', 'email', 'specialty__name', 'user__username']
     list_select_related = ['specialty']
+
+    def save_model(self, request, obj, form, change):
+        old_user = Doctor.objects.filter(pk=obj.pk).values_list('user_id', flat=True).first() if change else None
+        super().save_model(request, obj, form, change)
+        medical, _ = Group.objects.get_or_create(name='Médico')
+        medical.permissions.add(*Permission.objects.filter(content_type__app_label='theatre', codename='view_own_agenda'))
+        if obj.user_id:
+            obj.user.groups.add(medical)
+        if old_user and old_user != obj.user_id:
+            get_user_model().objects.get(pk=old_user).groups.remove(medical)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
@@ -144,6 +155,7 @@ class EmailSettingsAdmin(admin.ModelAdmin):
     fieldsets = [
         ('Conexión con el servicio de correos', {'fields': ['enabled', 'host', 'port', 'connection_type', 'username', 'smtp_password', 'password_saved']}),
         ('Remitente y aplicación', {'fields': ['from_email', 'from_name', 'public_url']}),
+        ('Recordatorio de asistencia', {'fields': ['notify_reminder', 'reminder_minutes']}),
         ('Avisos habilitados', {'fields': ['notify_confirmed', 'notify_modified', 'notify_cancelled',
                                           'notify_relocated', 'notify_reschedule']}),
     ]

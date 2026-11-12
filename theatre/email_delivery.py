@@ -46,6 +46,10 @@ def deliver_one(now=None):
     notification = queryset.first()
     if notification is None:
         return False
+    if notification.event == 'reminder':
+        from .reminders import refresh_reminder
+        if not refresh_reminder(notification, config, now):
+            return True
     notification.attempts += 1
     try:
         with smtp_connection(config) as smtp:
@@ -66,7 +70,7 @@ def deliver_one(now=None):
         notification.status = 'sent'
         notification.sent_at = timezone.now()
         notification.last_error = ''
-    notification.save(update_fields=['attempts', 'status', 'next_attempt_at', 'last_error', 'sent_at'])
+    notification.save(update_fields=['attempts', 'status', 'next_attempt_at', 'last_error', 'sent_at', 'body'])
     return True
 
 
